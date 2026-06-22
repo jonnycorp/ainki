@@ -45,7 +45,24 @@ Ever wanted more colloquial example sentences for a Japanese word while studying
 
 ## 🗻 Configuration
 
-<!-- TODO: Finish after dev -->
+Here's an explanation of the settings that you should modify in *Tools → ainki Settings*.
+
+Key settings:
+- `API key` — your provider key ***(MOST IMPORATANT)***
+- `Hotkey` — the reviewer shortcut to open the sentence generator
+- `Provider` / `Model` — currently defaults to `anthropic` and `claude-haiku-4-5`
+- `Level` — learner level you want the sentences to be created for
+- `Number of sentences` — how many sentences are generated when you click *Generate*
+- `Write mode` — `append` will add new sentences below existing content; `overwrite` replaces everything if you want to switch it up from time to time
+- `Append separator` — customize how sentences should be added, default is on a new line (i.e. `<br>`)
+- `Furigana mode` — controls whether or not sentences should have furigana, or if you want to customize how it looks (i.e. `ruby` and `custom`)
+- `Furigana template` — used when `custom` mode is selected, with placeholders to dictate how furigana should appear next to the kanji
+
+Field mapping:
+- `default_mapping` determines the fallback source and target fields for cards
+- `field_mappings` saves the field mappings per note type so you can generate sentences for any of your cards
+
+These settings are obviously saved by Anki’s `addonManager`, so only need to setup once
 
 ## 🗼 Usage
 
