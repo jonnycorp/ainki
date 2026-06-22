@@ -1,0 +1,8 @@
+{
+  "hotkey": "Ctrl+Shift+E",
+  "field_mappings": {},
+  "default_mapping": {
+    "source": "Front",
+    "target": "Back"
+  }
+}
