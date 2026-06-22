@@ -7,7 +7,7 @@ Entry point. Registers the hotkey on the Reviewer window.
 """
 
 from aqt import mw, gui_hooks
-from aqt.qt import QShortcut, QKeySequence
+from aqt.qt import QShortcut, QKeySequence, QAction, qconnect
 from aqt.utils import showWarning
 from anki.utils import html_to_text_line
 
@@ -46,6 +46,8 @@ def _on_hotkey():
         vocab_word=vocab_word,
         note_type_name=note_type_name,
         mapping_is_default=not config.has_mapping(note_type_name),
+        note=note,
+        target_field=mapping["target"],
     )
     dialog.exec()
 
@@ -63,3 +65,18 @@ def _install_shortcut(_card):
 
 gui_hooks.reviewer_did_show_question.append(_install_shortcut)
 gui_hooks.reviewer_did_show_answer.append(_install_shortcut)
+
+
+def _open_settings():
+    # Imported lazily: building the dialog enumerates note types, which needs a
+    # loaded collection (guaranteed once a profile is open).
+    from .ui.settings_dialog import SettingsDialog
+
+    SettingsDialog(parent=mw).exec()
+
+
+# Tools → ainki Settings, plus the add-on's Config button → same dialog.
+_settings_action = QAction("ainki Settings", mw)
+qconnect(_settings_action.triggered, _open_settings)
+mw.form.menuTools.addAction(_settings_action)
+mw.addonManager.setConfigAction(__name__, _open_settings)
