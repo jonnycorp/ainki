@@ -1,5 +1,15 @@
 {
   "hotkey": "Ctrl+Shift+E",
+  "provider": "anthropic",
+  "model": "claude-haiku-4-5",
+  "api_key": "",
+  "level": "intermediate",
+  "num_sentences": 5,
+  "write_mode": "append",
+  "append_separator": "<br>",
+  "donation_url": "",
+  "furigana_mode": "ruby",
+  "furigana_template": "{kanji}[{reading}]",
   "field_mappings": {},
   "default_mapping": {
     "source": "Front",
