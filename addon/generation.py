@@ -146,10 +146,64 @@ def _strip_code_fences(text: str) -> str:
 # --- rendering --------------------------------------------------------------
 
 
+def _split_runs(text: str) -> list[tuple[str, bool]]:
+    """Split text into consecutive runs of (substring, is_kanji)."""
+    runs: list[tuple[str, bool]] = []
+    for ch in text:
+        is_kanji = bool(_KANJI.match(ch))
+        if runs and runs[-1][1] == is_kanji:
+            runs[-1] = (runs[-1][0] + ch, is_kanji)
+        else:
+            runs.append((ch, is_kanji))
+    return runs
+
+
+def _align_furigana(text: str, reading: str):
+    """Map the reading onto the kanji runs only, leaving okurigana/kana bare.
+
+    Returns a list of (substring, reading_or_None) — None for kana runs — or None
+    overall if the reading can't be cleanly aligned (caller falls back to wrapping
+    the whole token). Peels matching kana off the reading so 新しい/あたらしい →
+    [(新, あたら), (しい, None)].
+    """
+    runs = _split_runs(text)
+    out = []
+    ri = 0
+    for i, (sub, is_kanji) in enumerate(runs):
+        if not is_kanji:
+            if reading[ri:ri + len(sub)] != sub:
+                return None  # kana doesn't line up — bail
+            out.append((sub, None))
+            ri += len(sub)
+        else:
+            # This kanji run reads up to where the next (kana) run appears.
+            if i + 1 < len(runs):
+                pos = reading.find(runs[i + 1][0], ri)
+                if pos == -1:
+                    return None
+                kana = reading[ri:pos]
+                ri = pos
+            else:
+                kana = reading[ri:]
+                ri = len(reading)
+            if not kana:
+                return None  # kanji with no reading — misaligned
+            out.append((sub, kana))
+    return out if ri == len(reading) else None
+
+
+def _wrap(mode: str, template: str, kanji: str, reading: str) -> str:
+    if mode == "ruby":
+        return f"<ruby>{kanji}<rt>{reading}</rt></ruby>"
+    # custom — literal replace so stray braces in the template are safe
+    return template.replace("{kanji}", kanji).replace("{reading}", reading)
+
+
 def render(tokens: list[dict], target: str) -> str:
     """Render tokens to field HTML, applying furigana per the configured mode.
 
-    Furigana is added to every kanji-bearing token except the target word (left
+    Furigana sits only on the kanji within a token, not its kana okurigana
+    (新しい → あたら over 新, しい left bare), and never on the target word (kept
     bare so it stays the one unknown). Reads furigana config fresh so a settings
     change applies without regenerating.
     """
@@ -162,8 +216,16 @@ def render(tokens: list[dict], target: str) -> str:
         is_target = tok.get("is_target") or (target and target in text)
         if mode == "off" or is_target or not reading or not _KANJI.search(text):
             parts.append(text)
-        elif mode == "ruby":
-            parts.append(f"<ruby>{text}<rt>{reading}</rt></ruby>")
-        else:  # custom — literal replace so stray braces in the template are safe
-            parts.append(template.replace("{kanji}", text).replace("{reading}", reading))
+            continue
+        segments = _align_furigana(text, reading)
+        if segments is None:
+            # Couldn't peel okurigana cleanly — wrap the whole token (old behaviour).
+            parts.append(_wrap(mode, template, text, reading))
+        else:
+            parts.append(
+                "".join(
+                    sub if kana is None else _wrap(mode, template, sub, kana)
+                    for sub, kana in segments
+                )
+            )
     return "".join(parts)
