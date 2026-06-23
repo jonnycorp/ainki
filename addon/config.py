@@ -25,27 +25,78 @@ def get_hotkey() -> str:
     return _raw().get("hotkey", "Ctrl+E")
 
 
+# --- providers --------------------------------------------------------------
+
+# Per-provider defaults, also the source of truth for which providers exist.
+# `base_url` is "" for providers whose endpoint is fixed (anthropic, google).
+PROVIDER_DEFAULTS = {
+    "anthropic": {"model": "claude-haiku-4-5", "api_key": "", "base_url": ""},
+    "openai": {"model": "gpt-4o-mini", "api_key": "", "base_url": "https://api.openai.com/v1"},
+    "google": {"model": "gemini-2.0-flash", "api_key": "", "base_url": ""},
+    "openai_compatible": {"model": "", "api_key": "", "base_url": ""},
+}
+
+# Per-provider env-var fallback for the key (dev/testing convenience; only
+# inherited when Anki is launched from the terminal that exported it).
+_PROVIDER_ENV = {
+    "anthropic": "ANTHROPIC_API_KEY",
+    "openai": "OPENAI_API_KEY",
+    "google": "GOOGLE_API_KEY",
+}
+
+
+def get_active_provider() -> str:
+    raw = _raw()
+    # Fall back to the legacy flat "provider" key for pre-multi-provider installs.
+    return raw.get("active_provider") or raw.get("provider", "anthropic")
+
+
+# Backwards-compatible alias.
 def get_provider_name() -> str:
-    return _raw().get("provider", "anthropic")
+    return get_active_provider()
+
+
+def get_provider_config(name: str) -> dict:
+    """Effective {model, api_key, base_url} for a provider.
+
+    Order for the key: stored slot → legacy flat key (anthropic only, for
+    pre-multi-provider installs) → env var. Never log the result.
+    """
+    raw = _raw()
+    cfg = dict(PROVIDER_DEFAULTS.get(name, {"model": "", "api_key": "", "base_url": ""}))
+    stored = (raw.get("providers") or {}).get(name, {})
+    cfg.update({k: v for k, v in stored.items() if v is not None})
+
+    key = cfg.get("api_key", "")
+    if not key and name == "anthropic":
+        key = raw.get("api_key", "")  # legacy migration
+    if not key and name in _PROVIDER_ENV:
+        key = os.environ.get(_PROVIDER_ENV[name], "")
+    cfg["api_key"] = key
+    return cfg
+
+
+def all_providers_config() -> dict:
+    """Every provider's stored config (for the settings dialog to stage)."""
+    return {name: get_provider_config(name) for name in PROVIDER_DEFAULTS}
+
+
+def get_raw_api_key(name: str) -> str:
+    """A provider's stored key only (no env fallback) — for prefilling the
+    settings field, so an env-supplied secret is never rendered into the UI."""
+    stored = (_raw().get("providers") or {}).get(name, {}).get("api_key", "")
+    if not stored and name == "anthropic":
+        stored = _raw().get("api_key", "")  # legacy
+    return stored
 
 
 def get_model() -> str:
-    return _raw().get("model", "claude-haiku-4-5")
+    return get_provider_config(get_active_provider())["model"]
 
 
 def get_api_key() -> str:
-    """
-    Plaintext BYOK key. Config value wins; falls back to the ANTHROPIC_API_KEY
-    env var (a dev/testing convenience — only inherited when Anki is launched
-    from the terminal that exported it). Never log this value.
-    """
-    return _raw().get("api_key", "") or os.environ.get("ANTHROPIC_API_KEY", "")
-
-
-def get_raw_api_key() -> str:
-    """The configured key only (no env fallback) — for prefilling the settings
-    field, so an env-supplied secret is never rendered into the UI."""
-    return _raw().get("api_key", "")
+    """Active provider's key (stored → legacy → env). Never log this value."""
+    return get_provider_config(get_active_provider())["api_key"]
 
 
 def get_level() -> str:

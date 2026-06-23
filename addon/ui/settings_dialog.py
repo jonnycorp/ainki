@@ -33,7 +33,19 @@ from aqt.qt import (
 
 from .. import config
 
-_MODEL_PRESETS = ["claude-haiku-4-5", "claude-sonnet-4-6", "claude-opus-4-8"]
+_PROVIDER_LABELS = [
+    ("anthropic", "Anthropic (Claude)"),
+    ("openai", "OpenAI"),
+    ("google", "Google Gemini"),
+    ("openai_compatible", "OpenAI-compatible (custom URL)"),
+]
+_PROVIDER_MODEL_PRESETS = {
+    "anthropic": ["claude-haiku-4-5", "claude-sonnet-4-6", "claude-opus-4-8"],
+    "openai": ["gpt-4o-mini", "gpt-4o"],
+    "google": ["gemini-2.0-flash", "gemini-1.5-pro"],
+    "openai_compatible": [],
+}
+_BASE_URL_PROVIDERS = {"openai", "openai_compatible"}
 _LEVEL_PRESETS = ["beginner", "intermediate", "advanced", "N5", "N4", "N3", "N2", "N1"]
 _SEPARATOR_PRESETS = ["<br>", "<br><br>"]
 
@@ -48,6 +60,17 @@ class SettingsDialog(QDialog):
         self._mappings = config.all_mappings()
         self._current_nt = None
         self._loading = False  # guards programmatic combo repopulation
+
+        # Staged per-provider settings (key uses stored value only, never env).
+        self._providers = {
+            name: {
+                "model": config.get_provider_config(name)["model"],
+                "base_url": config.get_provider_config(name).get("base_url", ""),
+                "api_key": config.get_raw_api_key(name),
+            }
+            for name in config.PROVIDER_DEFAULTS
+        }
+        self._current_provider = None
 
         layout = QVBoxLayout(self)
 
@@ -176,30 +199,77 @@ class SettingsDialog(QDialog):
         tab = QWidget()
         form = QFormLayout(tab)
 
-        self.api_key_edit = QLineEdit(config.get_raw_api_key())
+        self.provider_combo = QComboBox()
+        for value, label in _PROVIDER_LABELS:
+            self.provider_combo.addItem(label, value)
+        idx = self.provider_combo.findData(config.get_active_provider())
+        self.provider_combo.setCurrentIndex(idx if idx >= 0 else 0)
+        form.addRow("Provider:", self.provider_combo)
+
+        self.api_key_edit = QLineEdit()
         self.api_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
         form.addRow("API key:", self.api_key_edit)
         form.addRow(
             "",
             QLabel(
                 "<span style='color:gray;'>Stored in plaintext on disk. Use a key "
-                "scoped to this purpose.</span>"
+                "scoped to this purpose. Each provider keeps its own key.</span>"
             ),
         )
 
-        self.provider_combo = QComboBox()
-        self.provider_combo.setEditable(True)
-        self.provider_combo.addItems(["anthropic"])
-        self.provider_combo.setCurrentText(config.get_provider_name())
-        form.addRow("Provider:", self.provider_combo)
-
         self.model_combo = QComboBox()
         self.model_combo.setEditable(True)
-        self.model_combo.addItems(_MODEL_PRESETS)
-        self.model_combo.setCurrentText(config.get_model())
         form.addRow("Model:", self.model_combo)
 
+        self.base_url_label = QLabel("Base URL:")
+        self.base_url_edit = QLineEdit()
+        form.addRow(self.base_url_label, self.base_url_edit)
+        self.base_url_hint = QLabel(
+            "<span style='color:gray;'>Any OpenAI-compatible endpoint — e.g. "
+            "OpenRouter <code>https://openrouter.ai/api/v1</code>, Groq "
+            "<code>https://api.groq.com/openai/v1</code>, Ollama "
+            "<code>http://localhost:11434/v1</code>.</span>"
+        )
+        self.base_url_hint.setWordWrap(True)
+        form.addRow("", self.base_url_hint)
+
+        self._current_provider = self.provider_combo.currentData()
+        self._load_provider_fields(self._current_provider)
+        qconnect(self.provider_combo.currentIndexChanged, self._on_provider_changed)
         return tab
+
+    # --- provider wiring --------------------------------------------------
+
+    def _on_provider_changed(self, *_):
+        if self._loading:
+            return
+        self._stage_current_provider()
+        self._current_provider = self.provider_combo.currentData()
+        self._load_provider_fields(self._current_provider)
+
+    def _load_provider_fields(self, name: str):
+        self._loading = True
+        data = self._providers.get(name, {})
+        self.api_key_edit.setText(data.get("api_key", ""))
+        self.model_combo.clear()
+        self.model_combo.addItems(_PROVIDER_MODEL_PRESETS.get(name, []))
+        self.model_combo.setCurrentText(data.get("model", ""))
+        self.base_url_edit.setText(data.get("base_url", ""))
+
+        show_base = name in _BASE_URL_PROVIDERS
+        self.base_url_label.setVisible(show_base)
+        self.base_url_edit.setVisible(show_base)
+        self.base_url_hint.setVisible(name == "openai_compatible")
+        self._loading = False
+
+    def _stage_current_provider(self):
+        if not self._current_provider:
+            return
+        self._providers[self._current_provider] = {
+            "api_key": self.api_key_edit.text(),
+            "model": self.model_combo.currentText().strip(),
+            "base_url": self.base_url_edit.text().strip(),
+        }
 
     # --- field-mapping wiring --------------------------------------------
 
@@ -259,11 +329,15 @@ class SettingsDialog(QDialog):
     # --- save -------------------------------------------------------------
 
     def _on_save(self):
+        self._stage_current_provider()
         config.save_settings(
             {
-                "provider": self.provider_combo.currentText().strip(),
-                "model": self.model_combo.currentText().strip(),
-                "api_key": self.api_key_edit.text(),
+                "active_provider": self.provider_combo.currentData(),
+                "providers": {n: dict(v) for n, v in self._providers.items()},
+                # Neutralise legacy flat keys so a cleared per-provider key can't
+                # be resurrected from a pre-multi-provider config.
+                "api_key": "",
+                "model": "",
                 "level": self.level_combo.currentText().strip(),
                 "num_sentences": self.count_spin.value(),
                 "write_mode": self.mode_combo.currentData(),
