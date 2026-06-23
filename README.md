@@ -95,6 +95,7 @@ ainki/                            # repo root
 │   ├── config.json               # default config
 │   ├── llm.py                    # BYOK provider layer
 │   ├── generation.py             # where the magic is
+│   ├── i18n.py                   # UI text (en / ja)
 │   └── ui/                       # Qt dialogs
 │       ├── sentence_dialog.py    # generation popup
 │       └── settings_dialog.py    # settings popup

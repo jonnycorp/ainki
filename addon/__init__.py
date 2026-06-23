@@ -12,6 +12,7 @@ from aqt.utils import showWarning
 from anki.utils import html_to_text_line
 
 from . import config
+from .i18n import tr
 from .ui.sentence_dialog import SentenceDialog
 
 
@@ -33,9 +34,12 @@ def _on_hotkey():
 
     if source_field not in note:
         showWarning(
-            f"Field '{source_field}' not found on note type '{note_type_name}'.\n\n"
-            f"Available fields: {', '.join(note.keys())}\n\n"
-            "Configure field mappings in the add-on settings."
+            tr(
+                "err.field_not_found",
+                field=source_field,
+                note_type=note_type_name,
+                fields=", ".join(note.keys()),
+            )
         )
         return
 
@@ -76,7 +80,7 @@ def _open_settings():
 
 
 # Tools → ainki Settings, plus the add-on's Config button → same dialog.
-_settings_action = QAction("ainki Settings", mw)
+_settings_action = QAction(tr("menu.settings"), mw)
 qconnect(_settings_action.triggered, _open_settings)
 mw.form.menuTools.addAction(_settings_action)
 mw.addonManager.setConfigAction(__name__, _open_settings)

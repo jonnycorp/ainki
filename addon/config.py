@@ -25,6 +25,11 @@ def get_hotkey() -> str:
     return _raw().get("hotkey", "Ctrl+E")
 
 
+def get_language() -> str:
+    """UI language: 'auto' (follow Anki), or a base code like 'en' / 'ja'."""
+    return _raw().get("language", "auto")
+
+
 def get_provider_name() -> str:
     return _raw().get("provider", "anthropic")
 

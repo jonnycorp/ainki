@@ -17,6 +17,7 @@ import json
 import re
 
 from . import config, llm
+from .i18n import tr
 
 # Kanji (incl. CJK Ext-A) plus the iteration mark.
 _KANJI = re.compile(r"[㐀-䶿一-鿿々]")
@@ -75,9 +76,9 @@ def _load_array(text: str) -> list:
     try:
         data = json.loads(cleaned)
     except ValueError as err:
-        raise llm.LLMError("The model returned an unexpected format.") from err
+        raise llm.LLMError(tr("err.bad_format")) from err
     if not isinstance(data, list):
-        raise llm.LLMError("The model returned an unexpected format.")
+        raise llm.LLMError(tr("err.bad_format"))
     return data
 
 
@@ -88,7 +89,7 @@ def _parse_plain(data: list) -> list[dict]:
         if isinstance(e, dict) and e.get("jp")
     ]
     if not items:
-        raise llm.LLMError("The model returned no usable sentences.")
+        raise llm.LLMError(tr("err.no_sentences"))
     return items
 
 
@@ -108,7 +109,7 @@ def _parse_furigana(data: list) -> list[dict]:
             }
         )
     if not items:
-        raise llm.LLMError("The model returned no usable sentences.")
+        raise llm.LLMError(tr("err.no_sentences"))
     return items
 
 

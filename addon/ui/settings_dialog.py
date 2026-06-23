@@ -32,6 +32,7 @@ from aqt.qt import (
 )
 
 from .. import config
+from ..i18n import tr
 
 _MODEL_PRESETS = ["claude-haiku-4-5", "claude-sonnet-4-6", "claude-opus-4-8"]
 _LEVEL_PRESETS = ["beginner", "intermediate", "advanced", "N5", "N4", "N3", "N2", "N1"]
@@ -41,7 +42,7 @@ _SEPARATOR_PRESETS = ["<br>", "<br><br>"]
 class SettingsDialog(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
-        self.setWindowTitle("ainki Settings")
+        self.setWindowTitle(tr("set.title"))
         self.setMinimumWidth(520)
 
         # Staged field mappings — edits accumulate here, written on Save.
@@ -52,8 +53,8 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(self)
 
         tabs = QTabWidget()
-        tabs.addTab(self._build_general_tab(), "General")
-        tabs.addTab(self._build_api_tab(), "API Key")
+        tabs.addTab(self._build_general_tab(), tr("set.tab_general"))
+        tabs.addTab(self._build_api_tab(), tr("set.tab_api"))
         layout.addWidget(tabs)
 
         buttons = QDialogButtonBox(
@@ -72,13 +73,25 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(tab)
 
         # Top line
-        layout.addWidget(QLabel("<b>ainki</b> — AI example sentences for your reviews."))
+        layout.addWidget(QLabel(tr("set.intro")))
 
         # Donation placeholder — reserved space, blank until a URL is configured.
         layout.addWidget(self._build_donation_box())
 
+        # Language — default follows Anki; override pins the add-on's language.
+        lang_group = QGroupBox()
+        lang_form = QFormLayout(lang_group)
+        self.language_combo = QComboBox()
+        self.language_combo.addItem(tr("set.language_auto"), "auto")
+        self.language_combo.addItem("English", "en")
+        self.language_combo.addItem("日本語", "ja")
+        lang_idx = self.language_combo.findData(config.get_language())
+        self.language_combo.setCurrentIndex(lang_idx if lang_idx >= 0 else 0)
+        lang_form.addRow(tr("set.language"), self.language_combo)
+        layout.addWidget(lang_group)
+
         # Field mapping
-        mapping_group = QGroupBox("Field mapping")
+        mapping_group = QGroupBox(tr("set.field_mapping"))
         mapping_form = QFormLayout(mapping_group)
         self.note_type_combo = QComboBox()
         qconnect(self.note_type_combo.currentTextChanged, self._on_note_type_changed)
@@ -86,32 +99,30 @@ class SettingsDialog(QDialog):
         self.target_combo = QComboBox()
         qconnect(self.source_combo.currentTextChanged, self._on_field_changed)
         qconnect(self.target_combo.currentTextChanged, self._on_field_changed)
-        mapping_form.addRow("Note type:", self.note_type_combo)
-        mapping_form.addRow("Word field:", self.source_combo)
-        mapping_form.addRow("Append sentences to:", self.target_combo)
+        mapping_form.addRow(tr("set.note_type"), self.note_type_combo)
+        mapping_form.addRow(tr("set.word_field"), self.source_combo)
+        mapping_form.addRow(tr("set.append_to"), self.target_combo)
         layout.addWidget(mapping_group)
 
         # Append behaviour
-        append_group = QGroupBox("When adding a sentence")
+        append_group = QGroupBox(tr("set.when_adding"))
         append_form = QFormLayout(append_group)
         self.mode_combo = QComboBox()
-        self.mode_combo.addItem("Append to existing content", "append")
-        self.mode_combo.addItem("Overwrite the field", "overwrite")
+        self.mode_combo.addItem(tr("set.mode_append"), "append")
+        self.mode_combo.addItem(tr("set.mode_overwrite"), "overwrite")
         mode_idx = self.mode_combo.findData(config.get_write_mode())
         self.mode_combo.setCurrentIndex(mode_idx if mode_idx >= 0 else 0)
         self.sep_combo = QComboBox()
         self.sep_combo.setEditable(True)
         self.sep_combo.addItems(_SEPARATOR_PRESETS)
         self.sep_combo.setCurrentText(config.get_append_separator())
-        append_form.addRow("Mode:", self.mode_combo)
-        append_form.addRow("Separator (HTML):", self.sep_combo)
-        append_form.addRow(
-            "", QLabel("<span style='color:gray;'>Fields are HTML — use &lt;br&gt; for a line break.</span>")
-        )
+        append_form.addRow(tr("set.mode"), self.mode_combo)
+        append_form.addRow(tr("set.separator"), self.sep_combo)
+        append_form.addRow("", QLabel(tr("set.separator_hint")))
         layout.addWidget(append_group)
 
         # Generation
-        gen_group = QGroupBox("Generation")
+        gen_group = QGroupBox(tr("set.generation"))
         gen_form = QFormLayout(gen_group)
         self.level_combo = QComboBox()
         self.level_combo.setEditable(True)
@@ -120,32 +131,24 @@ class SettingsDialog(QDialog):
         self.count_spin = QSpinBox()
         self.count_spin.setRange(1, 20)
         self.count_spin.setValue(config.get_num_sentences())
-        gen_form.addRow("Learner level:", self.level_combo)
-        gen_form.addRow("Sentences per generation:", self.count_spin)
+        gen_form.addRow(tr("set.level"), self.level_combo)
+        gen_form.addRow(tr("set.count"), self.count_spin)
         layout.addWidget(gen_group)
 
         # Furigana — readings on non-target kanji.
-        fg_group = QGroupBox("Furigana")
+        fg_group = QGroupBox(tr("set.furigana"))
         fg_form = QFormLayout(fg_group)
         self.furigana_combo = QComboBox()
-        self.furigana_combo.addItem("Off", "off")
-        self.furigana_combo.addItem("Ruby (HTML, works on any template)", "ruby")
-        self.furigana_combo.addItem("Custom wrapper", "custom")
+        self.furigana_combo.addItem(tr("set.furigana_off"), "off")
+        self.furigana_combo.addItem(tr("set.furigana_ruby"), "ruby")
+        self.furigana_combo.addItem(tr("set.furigana_custom"), "custom")
         fg_idx = self.furigana_combo.findData(config.get_furigana_mode())
         self.furigana_combo.setCurrentIndex(fg_idx if fg_idx >= 0 else 1)
         qconnect(self.furigana_combo.currentIndexChanged, self._on_furigana_mode_changed)
         self.furigana_template_edit = QLineEdit(config.get_furigana_template())
-        fg_form.addRow("Mode:", self.furigana_combo)
-        fg_form.addRow("Custom wrapper:", self.furigana_template_edit)
-        fg_form.addRow(
-            "",
-            QLabel(
-                "<span style='color:gray;'>Use {kanji} and {reading}. "
-                "e.g. <code>{kanji}[{reading}]</code> or "
-                "<code>&lt;ruby&gt;{kanji}&lt;rt&gt;{reading}&lt;/rt&gt;&lt;/ruby&gt;</code>. "
-                "The target word is always left bare.</span>"
-            ),
-        )
+        fg_form.addRow(tr("set.mode"), self.furigana_combo)
+        fg_form.addRow(tr("set.custom_wrapper"), self.furigana_template_edit)
+        fg_form.addRow("", QLabel(tr("set.furigana_hint")))
         layout.addWidget(fg_group)
         self._on_furigana_mode_changed()  # set initial enabled state
 
@@ -156,16 +159,16 @@ class SettingsDialog(QDialog):
         self.furigana_template_edit.setEnabled(self.furigana_combo.currentData() == "custom")
 
     def _build_donation_box(self) -> QWidget:
-        box = QGroupBox("Support")
+        box = QGroupBox(tr("set.support"))
         box.setObjectName("ainkiDonationBox")  # styling hook for later
         inner = QVBoxLayout(box)
         url = config.get_donation_url()
         if url:
-            label = QLabel(f'<a href="{url}">Buy me a coffee ☕</a>')
+            label = QLabel(f'<a href="{url}">{tr("set.donate")}</a>')
             label.setOpenExternalLinks(True)
             label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
         else:
-            label = QLabel("<span style='color:gray;'>(support link coming soon)</span>")
+            label = QLabel(tr("set.support_coming"))
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         inner.addWidget(label)
         return box
@@ -178,26 +181,20 @@ class SettingsDialog(QDialog):
 
         self.api_key_edit = QLineEdit(config.get_raw_api_key())
         self.api_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        form.addRow("API key:", self.api_key_edit)
-        form.addRow(
-            "",
-            QLabel(
-                "<span style='color:gray;'>Stored in plaintext on disk. Use a key "
-                "scoped to this purpose.</span>"
-            ),
-        )
+        form.addRow(tr("set.api_key"), self.api_key_edit)
+        form.addRow("", QLabel(tr("set.api_key_note")))
 
         self.provider_combo = QComboBox()
         self.provider_combo.setEditable(True)
         self.provider_combo.addItems(["anthropic"])
         self.provider_combo.setCurrentText(config.get_provider_name())
-        form.addRow("Provider:", self.provider_combo)
+        form.addRow(tr("set.provider"), self.provider_combo)
 
         self.model_combo = QComboBox()
         self.model_combo.setEditable(True)
         self.model_combo.addItems(_MODEL_PRESETS)
         self.model_combo.setCurrentText(config.get_model())
-        form.addRow("Model:", self.model_combo)
+        form.addRow(tr("set.model"), self.model_combo)
 
         return tab
 
@@ -261,6 +258,7 @@ class SettingsDialog(QDialog):
     def _on_save(self):
         config.save_settings(
             {
+                "language": self.language_combo.currentData(),
                 "provider": self.provider_combo.currentText().strip(),
                 "model": self.model_combo.currentText().strip(),
                 "api_key": self.api_key_edit.text(),

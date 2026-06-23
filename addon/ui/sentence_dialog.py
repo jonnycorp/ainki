@@ -36,6 +36,7 @@ from aqt.qt import (
 from aqt.utils import showWarning
 
 from .. import config, generation
+from ..i18n import tr
 
 _ITEM_FLAGS = (
     Qt.ItemFlag.ItemIsSelectable
@@ -62,25 +63,22 @@ class SentenceDialog(QDialog):
         self._vocab = vocab_word
         self._syncing = False  # guards selection<->checkbox mirroring
 
-        self.setWindowTitle("AI Sentence Generator")
+        self.setWindowTitle(tr("dlg.title"))
         self.setMinimumWidth(540)
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowCloseButtonHint)
 
         layout = QVBoxLayout(self)
 
-        info_label = QLabel(f"Note type: <b>{note_type_name}</b>")
+        info_label = QLabel(tr("dlg.note_type", name=note_type_name))
         if mapping_is_default:
-            info_label.setText(
-                info_label.text()
-                + ' <span style="color:#c80;">(using default field mapping — configure in settings)</span>'
-            )
+            info_label.setText(info_label.text() + tr("dlg.default_mapping"))
         layout.addWidget(info_label)
 
-        layout.addWidget(QLabel("Vocab word:"))
+        layout.addWidget(QLabel(tr("dlg.vocab_word")))
         self.word_input = QLineEdit(vocab_word)
         layout.addWidget(self.word_input)
 
-        layout.addWidget(QLabel("Select one or more (click, Ctrl-click, Shift-range; double-click to edit):"))
+        layout.addWidget(QLabel(tr("dlg.select_hint")))
         self.sentence_list = QListWidget()
         self.sentence_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.sentence_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -91,14 +89,14 @@ class SentenceDialog(QDialog):
         layout.addWidget(self.sentence_list)
 
         btn_row = QHBoxLayout()
-        self.generate_btn = QPushButton("Generate")
-        self.generate_more_btn = QPushButton("Generate More")
+        self.generate_btn = QPushButton(tr("dlg.generate"))
+        self.generate_more_btn = QPushButton(tr("dlg.generate_more"))
         self.generate_more_btn.setEnabled(False)
-        self.select_all_btn = QPushButton("Select all")
+        self.select_all_btn = QPushButton(tr("dlg.select_all"))
         self.select_all_btn.setEnabled(False)
-        self.add_btn = QPushButton("Add to Card")
+        self.add_btn = QPushButton(tr("dlg.add_to_card"))
         self.add_btn.setEnabled(False)
-        self.cancel_btn = QPushButton("Cancel")
+        self.cancel_btn = QPushButton(tr("dlg.cancel"))
 
         btn_row.addWidget(self.generate_btn)
         btn_row.addWidget(self.generate_more_btn)
@@ -119,7 +117,7 @@ class SentenceDialog(QDialog):
     def _on_generate(self, append: bool):
         vocab = self.word_input.text().strip()
         if not vocab:
-            showWarning("Enter a vocab word to generate sentences for.")
+            showWarning(tr("dlg.enter_vocab"))
             return
         self._vocab = vocab
 
@@ -133,7 +131,7 @@ class SentenceDialog(QDialog):
             op=lambda col: generation.generate_sentences(vocab, level, n),
             success=lambda items: self._on_generated(items, append=append),
         )
-        op.failure(self._on_error).with_progress("Generating sentences…").run_in_background()
+        op.failure(self._on_error).with_progress(tr("dlg.generating")).run_in_background()
 
     def _on_generated(self, items: list[dict], append: bool):
         self._set_busy(False)
@@ -207,7 +205,7 @@ class SentenceDialog(QDialog):
             return
         row = self.sentence_list.row(item)
         menu = QMenu(self)
-        revert = menu.addAction("Revert to original")
+        revert = menu.addAction(tr("dlg.revert"))
         revert.setEnabled(item.text() != self._items[row]["jp"])
         chosen = menu.exec(self.sentence_list.mapToGlobal(pos))
         if chosen is revert:
@@ -225,11 +223,13 @@ class SentenceDialog(QDialog):
             return
 
         if self.target_field not in self.note:
-            note_type_name = self.note.note_type()["name"]
             showWarning(
-                f"Target field '{self.target_field}' not found on note type "
-                f"'{note_type_name}'.\n\nAvailable fields: {', '.join(self.note.keys())}\n\n"
-                "Configure field mappings in the add-on settings."
+                tr(
+                    "err.target_not_found",
+                    field=self.target_field,
+                    note_type=self.note.note_type()["name"],
+                    fields=", ".join(self.note.keys()),
+                )
             )
             return
 

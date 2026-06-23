@@ -1,5 +1,6 @@
 {
   "hotkey": "Ctrl+Shift+E",
+  "language": "auto",
   "provider": "anthropic",
   "model": "claude-haiku-4-5",
   "api_key": "",
