@@ -8,7 +8,6 @@
 
 Ever wanted more colloquial example sentences for a Japanese word while studying on **Anki**? This add-on, `ainki`, generates as many new examples as you want and lets you add them directly to your card—all mid-session, without leaving Anki or spending time mining yourself.
 
-
 ## 🎍 Features
 
 - **Reviewer Shortcut** — set whatever hotkey you like to open the generator during review
@@ -41,7 +40,6 @@ Ever wanted more colloquial example sentences for a Japanese word while studying
 3. Restart Anki
 
 > For full development setup and live edit support, see **Development** section below
-
 
 ## 🗻 Configuration
 
