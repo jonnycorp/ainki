@@ -14,6 +14,7 @@ as tokens with readings + an `is_target` flag, and we render the wrapper locally
 """
 
 import json
+import random
 import re
 
 from . import config, llm
@@ -23,18 +24,18 @@ from .i18n import tr
 _KANJI = re.compile(r"[㐀-䶿一-鿿々]")
 
 _SYSTEM_PLAIN = (
-    "You generate natural, colloquial Japanese example sentences for a language "
-    "learner. The sentences must sound like everyday spoken Japanese, not textbook "
-    "prose, and must be appropriate for the learner's stated level.\n\n"
+    "You generate natural Japanese example sentences for a language learner. "
+    "The sentences must be natural, fit the requested register, and suit the "
+    "learner's stated level.\n\n"
     "Respond with ONLY a JSON array — no prose, no markdown, no code fences. Each "
     'element is an object: {"jp": "<the Japanese sentence>", "en": "<a short '
     'English translation>"}. Every sentence must use the given vocabulary word.'
 )
 
 _SYSTEM_FURIGANA = (
-    "You generate natural, colloquial Japanese example sentences for a language "
-    "learner. The sentences must sound like everyday spoken Japanese, not textbook "
-    "prose, and must be appropriate for the learner's stated level.\n\n"
+    "You generate natural Japanese example sentences for a language learner. "
+    "The sentences must be natural, fit the requested register, and suit the "
+    "learner's stated level.\n\n"
     "Respond with ONLY a JSON array — no prose, no markdown, no code fences. Each "
     "element is an object with two keys:\n"
     '  "en": a short English translation,\n'
@@ -47,20 +48,56 @@ _SYSTEM_FURIGANA = (
 )
 
 
-def build_prompt(vocab: str, level: str, n: int, furigana: bool) -> tuple[str, str]:
+# Register/style injected per the user's setting. "casual" is the default and
+# preserves the colloquial behaviour the add-on shipped with.
+_STYLE_PROMPTS = {
+    "casual": "natural, colloquial, everyday spoken Japanese (casual register).",
+    "polite": "polite spoken Japanese (です/ます), as used with acquaintances or in service settings.",
+    "news": "formal written Japanese in a news / article style.",
+    "business": "polite business Japanese (keigo where natural), as in workplace email and meetings.",
+    "mixed": "a mix of registers — vary between casual, polite, and formal across the sentences.",
+}
+
+# Neutral subject areas sampled at random each call to decorrelate regenerations.
+# Topics (not registers) so they compose with any style.
+_TOPICS = [
+    "weather", "work", "school", "food and cooking", "travel", "shopping",
+    "money", "health", "family", "friends", "hobbies", "sports", "technology",
+    "music", "movies", "daily routine", "weekend plans", "transportation",
+    "the news", "nature", "pets", "housing", "feelings", "time and schedules",
+]
+
+
+def build_prompt(
+    vocab: str, level: str, n: int, furigana: bool, style: str, topics: str
+) -> tuple[str, str]:
     system = _SYSTEM_FURIGANA if furigana else _SYSTEM_PLAIN
+    register = _STYLE_PROMPTS.get(style, _STYLE_PROMPTS["casual"])
     user = (
         f"Target vocabulary word: {vocab}\n"
         f"Learner level: {level}\n"
+        f"Register: {register}\n"
+        f"Where natural, vary the situations across the sentences (e.g. {topics}). "
+        f"Prioritise natural use of the target word over fitting a topic.\n"
         f"Generate {n} sentences."
     )
     return system, user
 
 
+def _sample_topics(n: int) -> list[str]:
+    return random.sample(_TOPICS, min(max(n, 4), len(_TOPICS)))
+
+
 def generate_sentences(vocab: str, level: str, n: int) -> list[dict]:
-    """Returns items shaped {jp, en, tokens}. `tokens` is None when furigana is off."""
+    """Returns items shaped {jp, en, tokens}. `tokens` is None when furigana is off.
+
+    Injects the configured register plus a random sample of topics each call, so
+    repeated generations don't collapse onto the same canonical sentences.
+    """
     furigana = config.get_furigana_mode() != "off"
-    system, user = build_prompt(vocab, level, n, furigana)
+    style = config.get_style()
+    topics = ", ".join(_sample_topics(n))
+    system, user = build_prompt(vocab, level, n, furigana, style, topics)
     # Tokenised output is larger; give it more room.
     max_tokens = 4096 if furigana else 2048
     raw = llm.get_provider().complete(system, user, max_tokens=max_tokens)

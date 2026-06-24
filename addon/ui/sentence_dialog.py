@@ -52,7 +52,6 @@ class SentenceDialog(QDialog):
         parent,
         vocab_word: str,
         note_type_name: str,
-        mapping_is_default: bool,
         note,
         target_field: str,
     ):
@@ -69,10 +68,7 @@ class SentenceDialog(QDialog):
 
         layout = QVBoxLayout(self)
 
-        info_label = QLabel(tr("dlg.note_type", name=note_type_name))
-        if mapping_is_default:
-            info_label.setText(info_label.text() + tr("dlg.default_mapping"))
-        layout.addWidget(info_label)
+        layout.addWidget(QLabel(tr("dlg.note_type", name=note_type_name)))
 
         layout.addWidget(QLabel(tr("dlg.vocab_word")))
         self.word_input = QLineEdit(vocab_word)
@@ -80,6 +76,10 @@ class SentenceDialog(QDialog):
 
         layout.addWidget(QLabel(tr("dlg.select_hint")))
         self.sentence_list = QListWidget()
+        # Japanese reads small at default size — bump it for legibility.
+        list_font = self.sentence_list.font()
+        list_font.setPointSize(18)
+        self.sentence_list.setFont(list_font)
         self.sentence_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.sentence_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         qconnect(self.sentence_list.itemSelectionChanged, self._on_selection_changed)

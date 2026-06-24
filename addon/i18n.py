@@ -46,9 +46,6 @@ CATALOG = {
         # generation dialog
         "dlg.title": "AI Sentence Generator",
         "dlg.note_type": "Note type: <b>{name}</b>",
-        "dlg.default_mapping": (
-            ' <span style="color:#c80;">(using default field mapping — configure in settings)</span>'
-        ),
         "dlg.vocab_word": "Vocab word:",
         "dlg.select_hint": "Select one or more (click, Ctrl-click, Shift-range; double-click to edit):",
         "dlg.generate": "Generate",
@@ -80,6 +77,12 @@ CATALOG = {
         "set.generation": "Generation",
         "set.level": "Learner level:",
         "set.count": "Sentences per generation:",
+        "set.style": "Style:",
+        "set.style_casual": "Casual / spoken",
+        "set.style_polite": "Polite (です/ます)",
+        "set.style_news": "Formal / news",
+        "set.style_business": "Business",
+        "set.style_mixed": "Mixed",
         "set.furigana": "Furigana",
         "set.furigana_off": "Off",
         "set.furigana_ruby": "Ruby (HTML, works on any template)",
@@ -100,6 +103,7 @@ CATALOG = {
         "set.model": "Model:",
         "set.language": "Language:",
         "set.language_auto": "Auto (follow Anki)",
+        "set.restore_defaults": "Restore defaults",
     },
     # --- Japanese (draft — needs native-speaker review) ---------------------
     "ja": {
@@ -127,9 +131,6 @@ CATALOG = {
         ),
         "dlg.title": "AI例文ジェネレーター",
         "dlg.note_type": "ノートタイプ：<b>{name}</b>",
-        "dlg.default_mapping": (
-            ' <span style="color:#c80;">（デフォルトのフィールド対応を使用中 — 設定で変更できます）</span>'
-        ),
         "dlg.vocab_word": "単語：",
         "dlg.select_hint": "1つ以上選択してください（クリック、Ctrl+クリック、Shift+範囲選択／ダブルクリックで編集）：",
         "dlg.generate": "生成",
@@ -160,6 +161,12 @@ CATALOG = {
         "set.generation": "生成",
         "set.level": "学習レベル：",
         "set.count": "1回の生成数：",
+        "set.style": "文体：",
+        "set.style_casual": "カジュアル（話し言葉）",
+        "set.style_polite": "丁寧（です・ます）",
+        "set.style_news": "硬め・ニュース",
+        "set.style_business": "ビジネス",
+        "set.style_mixed": "ミックス",
         "set.furigana": "ふりがな",
         "set.furigana_off": "なし",
         "set.furigana_ruby": "ルビ（HTML・どのテンプレートでも動作）",
@@ -180,6 +187,7 @@ CATALOG = {
         "set.model": "モデル：",
         "set.language": "言語：",
         "set.language_auto": "自動（Ankiに従う）",
+        "set.restore_defaults": "デフォルトに戻す",
     },
 }
 
@@ -205,21 +213,25 @@ def _detect_anki_lang() -> str:
     return code.replace("-", "_").split("_")[0].lower()
 
 
-def current_lang() -> str:
-    """The language the add-on should render in: the config override, or Anki's."""
-    override = config.get_language()
-    if override and override != "auto":
-        return override
+def resolve_lang(code: str) -> str:
+    """An override code → a concrete language ('auto' resolves to Anki's)."""
+    if code and code != "auto":
+        return code
     return _detect_anki_lang()
 
 
-def tr(key: str, **kwargs) -> str:
-    """Translate `key` for the active language, with English then key-name fallback.
+def current_lang() -> str:
+    """The language the add-on should render in: the config override, or Anki's."""
+    return resolve_lang(config.get_language())
+
+
+def translate(key: str, lang: str, **kwargs) -> str:
+    """Translate `key` into an explicit language, with English then key-name
+    fallback. Used for live preview, where the chosen language isn't saved yet.
 
     Only interpolates when kwargs are passed, so catalog strings that contain
     literal braces (the furigana hint's {kanji}/{reading}) are left intact.
     """
-    lang = current_lang()
     text = CATALOG.get(lang, {}).get(key) or CATALOG[_DEFAULT].get(key, key)
     if kwargs:
         try:
@@ -227,3 +239,8 @@ def tr(key: str, **kwargs) -> str:
         except (KeyError, IndexError):
             pass
     return text
+
+
+def tr(key: str, **kwargs) -> str:
+    """Translate `key` for the active language."""
+    return translate(key, current_lang(), **kwargs)

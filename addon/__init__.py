@@ -49,7 +49,6 @@ def _on_hotkey():
         parent=mw,
         vocab_word=vocab_word,
         note_type_name=note_type_name,
-        mapping_is_default=not config.has_mapping(note_type_name),
         note=note,
         target_field=mapping["target"],
     )

@@ -6,6 +6,7 @@
   "api_key": "",
   "level": "intermediate",
   "num_sentences": 5,
+  "style": "casual",
   "write_mode": "append",
   "append_separator": "<br>",
   "donation_url": "",

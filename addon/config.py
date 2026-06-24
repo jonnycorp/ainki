@@ -62,6 +62,11 @@ def get_num_sentences() -> int:
     return _raw().get("num_sentences", 5)
 
 
+def get_style() -> str:
+    """Register injected into the prompt: casual / polite / news / business / mixed."""
+    return _raw().get("style", "casual")
+
+
 def get_write_mode() -> str:
     """How a chosen sentence lands in the target field: 'append' or 'overwrite'."""
     return _raw().get("write_mode", "append")
@@ -130,3 +135,11 @@ def save_settings(updates: dict) -> None:
     cfg = _raw()
     cfg.update(updates)
     _save(cfg)
+
+
+def defaults() -> dict:
+    """The add-on's config.json defaults (for 'Restore defaults')."""
+    try:
+        return mw.addonManager.addonConfigDefaults(_pkg()) or {}
+    except Exception:
+        return {}
