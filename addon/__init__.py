@@ -4,6 +4,9 @@ Entry point. Registers the hotkey on the Reviewer window.
 - Anki uses a hook system (`gui_hooks`). We attach to reviewer lifecycle
   hooks to install a QShortcut bound to the reviewer's web view.
 - The shortcut only fires during review, not in browser/editor.
+
+    TODO: test functionality when changing hotkeys, additionally when changing the hotkey
+          to a key that is already bound to another action in Anki, i.e. Ctrl+E or R
 """
 
 from aqt import mw, gui_hooks

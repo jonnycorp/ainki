@@ -1,19 +1,18 @@
 """
 Popup shown when the hotkey fires during review.
 
-Generation is an explicit button press. The LLM call runs off the Qt main thread
-via QueryOp (CLAUDE.md hard constraint #2) — the worker only does network work and
-never touches widgets; results come back through the success callback.
+Current features:
+- Multi-select; checkbox mirrors selection, can pick with normal click / Ctrl-click / Shift-range
+  on the entire row, or just click the checkbox.
+    TODO: click commands such as normal and ctrl-click on the row should also deselect it, like a checkbox
+    TODO: sentence font should be able to be changed from settings, different devices have different needs
 
-Candidate list:
-- Multi-select. Selection is the source of truth and a checkbox mirrors it, so you
-  can pick with normal click / Ctrl-click / Shift-range on the easy-to-hit row, or
-  click the checkbox — both stay in sync.
-- Double-click to edit a sentence; the original is kept for a right-click Revert.
-- Add to Card appends every selected sentence (in list order) using the configured
-  separator. Unedited sentences get furigana (rendered from the model's tokens);
-  edited ones are written as-is, since we can't re-derive accurate readings for
-  hand-typed text.
+- Double-click to edit a sentence, right-click to revert to original.
+    TODO: find place to maybe write this info, create tooltip
+
+- Add to Card appends every selected sentence (in list order) using the configured separator.
+    TODO: consider adding at least an indicator on which field is being written to, 
+          maybe even a preview of the result, or a way to choose the field right there (might be too much for a popup)
 """
 
 from aqt import mw
@@ -76,7 +75,6 @@ class SentenceDialog(QDialog):
 
         layout.addWidget(QLabel(tr("dlg.select_hint")))
         self.sentence_list = QListWidget()
-        # Japanese reads small at default size — bump it for legibility.
         list_font = self.sentence_list.font()
         list_font.setPointSize(18)
         self.sentence_list.setFont(list_font)
@@ -90,8 +88,7 @@ class SentenceDialog(QDialog):
 
         btn_row = QHBoxLayout()
         self.generate_btn = QPushButton(tr("dlg.generate"))
-        self.generate_more_btn = QPushButton(tr("dlg.generate_more"))
-        self.generate_more_btn.setEnabled(False)
+        self.generate_btn.setDefault(True)
         self.select_all_btn = QPushButton(tr("dlg.select_all"))
         self.select_all_btn.setEnabled(False)
         self.add_btn = QPushButton(tr("dlg.add_to_card"))
@@ -99,22 +96,20 @@ class SentenceDialog(QDialog):
         self.cancel_btn = QPushButton(tr("dlg.cancel"))
 
         btn_row.addWidget(self.generate_btn)
-        btn_row.addWidget(self.generate_more_btn)
         btn_row.addWidget(self.select_all_btn)
         btn_row.addStretch()
         btn_row.addWidget(self.add_btn)
         btn_row.addWidget(self.cancel_btn)
         layout.addLayout(btn_row)
 
-        qconnect(self.generate_btn.clicked, lambda: self._on_generate(append=False))
-        qconnect(self.generate_more_btn.clicked, lambda: self._on_generate(append=True))
+        qconnect(self.generate_btn.clicked, self._on_generate)
         qconnect(self.select_all_btn.clicked, lambda: self.sentence_list.selectAll())
         qconnect(self.add_btn.clicked, self._on_add)
         qconnect(self.cancel_btn.clicked, self.reject)
 
     # --- generation -------------------------------------------------------
 
-    def _on_generate(self, append: bool):
+    def _on_generate(self):
         vocab = self.word_input.text().strip()
         if not vocab:
             showWarning(tr("dlg.enter_vocab"))
@@ -129,15 +124,13 @@ class SentenceDialog(QDialog):
             parent=self,
             # Runs off the main thread; ignores `col`, only does network work.
             op=lambda col: generation.generate_sentences(vocab, level, n),
-            success=lambda items: self._on_generated(items, append=append),
+            success=self._on_generated,
         )
         op.failure(self._on_error).with_progress(tr("dlg.generating")).run_in_background()
 
-    def _on_generated(self, items: list[dict], append: bool):
+    def _on_generated(self, items: list[dict]):
         self._set_busy(False)
-        if not append:
-            self._items = []
-            self.sentence_list.clear()
+        was_empty = not self._items
 
         self._syncing = True
         self.sentence_list.blockSignals(True)
@@ -153,10 +146,10 @@ class SentenceDialog(QDialog):
         self._syncing = False
 
         self.sentence_list.setEnabled(True)
-        self.generate_more_btn.setEnabled(True)
         self.select_all_btn.setEnabled(bool(self._items))
-        if not append and self._items:
-            self.sentence_list.setCurrentRow(0)  # select first → mirrors check, enables Add
+        self.generate_btn.setText(tr("dlg.generate_more"))
+        if was_empty and self._items:
+            self.sentence_list.setCurrentRow(0)  # auto-select first → enables Add
 
     def _on_error(self, exc: Exception):
         self._set_busy(False)
@@ -164,7 +157,6 @@ class SentenceDialog(QDialog):
 
     def _set_busy(self, busy: bool):
         self.generate_btn.setEnabled(not busy)
-        self.generate_more_btn.setEnabled(not busy and bool(self._items))
 
     # --- selection <-> checkbox mirroring --------------------------------
 

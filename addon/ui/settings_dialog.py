@@ -1,7 +1,6 @@
 """
-Settings dialog — the configuration surface for non-coders. Opened from
-Tools → ainki Settings (and the add-on's Config button), so the user never has
-to hand-edit JSON or guess their note type's field names.
+Settings dialog — the configuration surface for users. Opened from
+Tools → ainki Settings (and the add-on's Config button)
 
 Tabs:
 - General — donation placeholder, per-note-type field mapping (real fields via

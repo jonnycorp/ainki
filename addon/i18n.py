@@ -105,7 +105,7 @@ CATALOG = {
         "set.language_auto": "Auto (follow Anki)",
         "set.restore_defaults": "Restore defaults",
     },
-    # --- Japanese (draft — needs native-speaker review) ---------------------
+    # --- Japanese (needs native-speaker review) ---------------------
     "ja": {
         "menu.settings": "ainki 設定",
         "err.bad_key": "APIキーが無効か期限切れです。アドオン設定で確認してください。",
