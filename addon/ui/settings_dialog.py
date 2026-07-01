@@ -165,6 +165,9 @@ class SettingsDialog(QDialog):
         self.count_spin = QSpinBox()
         self.count_spin.setRange(1, 20)
         self.count_spin.setValue(config.get_num_sentences())
+        self.font_spin = QSpinBox()  # candidate-list point size; device-dependent
+        self.font_spin.setRange(8, 48)
+        self.font_spin.setValue(config.get_sentence_font_size())
         self.style_combo = QComboBox()
         for i, value in enumerate(("casual", "polite", "news", "business", "mixed")):
             self.style_combo.addItem("", value)
@@ -174,6 +177,7 @@ class SettingsDialog(QDialog):
         self._add_row(gen_form, "set.level", self.level_combo)
         self._add_row(gen_form, "set.style", self.style_combo)
         self._add_row(gen_form, "set.count", self.count_spin)
+        self._add_row(gen_form, "set.font_size", self.font_spin)
         layout.addWidget(gen_group)
 
         # Furigana — readings on non-target kanji.
@@ -319,6 +323,7 @@ class SettingsDialog(QDialog):
             "api_key": self.api_key_edit.text(),
             "level": self.level_combo.currentText().strip(),
             "num_sentences": self.count_spin.value(),
+            "sentence_font_size": self.font_spin.value(),
             "style": self.style_combo.currentData(),
             "write_mode": self.mode_combo.currentData(),
             "append_separator": self.sep_combo.currentText(),
@@ -348,6 +353,7 @@ class SettingsDialog(QDialog):
         style_idx = self.style_combo.findData(d.get("style", "casual"))
         self.style_combo.setCurrentIndex(style_idx if style_idx >= 0 else 0)
         self.count_spin.setValue(d.get("num_sentences", 5))
+        self.font_spin.setValue(d.get("sentence_font_size", 18))
         mode_idx = self.mode_combo.findData(d.get("write_mode", "append"))
         self.mode_combo.setCurrentIndex(mode_idx if mode_idx >= 0 else 0)
         self.sep_combo.setCurrentText(d.get("append_separator", "<br>"))

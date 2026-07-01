@@ -1,17 +1,16 @@
 """
 Entry point. Registers the hotkey on the Reviewer window.
 
-- Anki uses a hook system (`gui_hooks`). We attach to reviewer lifecycle
-  hooks to install a QShortcut bound to the reviewer's web view.
-- The shortcut only fires during review, not in browser/editor.
-
-    TODO: test functionality when changing hotkeys, additionally when changing the hotkey
-          to a key that is already bound to another action in Anki, i.e. Ctrl+E or R
+- Anki uses a hook system (`gui_hooks`). We attach to reviewer lifecycle hooks to
+  install a QShortcut bound to the reviewer's web view; it only fires during review.
+- Bound once per session — a hotkey change in config takes effect on restart.
+- A non-blocking check warns once if the hotkey collides with a built-in reviewer
+  key (e.g. R, E), which can make either shortcut ambiguous. We don't block it.
 """
 
 from aqt import mw, gui_hooks
 from aqt.qt import QShortcut, QKeySequence, QAction, qconnect
-from aqt.utils import showWarning
+from aqt.utils import showWarning, tooltip
 from anki.utils import html_to_text_line
 
 from . import config
@@ -21,6 +20,7 @@ from .ui.sentence_dialog import SentenceDialog
 
 # Keep a reference so the QShortcut isn't garbage collected
 _shortcut_ref = None
+_conflict_checked = False  # warn about a hotkey clash at most once per session
 
 
 def _on_hotkey():
@@ -67,6 +67,33 @@ def _install_shortcut(_card):
     hotkey = config.get_hotkey()
     _shortcut_ref = QShortcut(QKeySequence(hotkey), mw.reviewer.web)
     _shortcut_ref.activated.connect(_on_hotkey)
+    _warn_if_hotkey_conflicts(hotkey)
+
+
+def _conflicting_reviewer_key(hotkey: str):
+    """The built-in reviewer key our hotkey collides with, or None."""
+    seq = QKeySequence(hotkey)
+    try:
+        # Reviewer shortcut entries are (key, callback[, ...]); key is the first item.
+        for entry in mw.reviewer._shortcutKeys():
+            key = entry[0] if isinstance(entry, (tuple, list)) else entry
+            if isinstance(key, str) and QKeySequence(key) == seq:
+                return key
+    except Exception:
+        return None  # private API — fail quiet rather than break review
+    return None
+
+
+def _warn_if_hotkey_conflicts(hotkey: str):
+    """Heads-up only (once/session): a clash can make the shortcut ambiguous. The
+    user decides — we never block or rebind."""
+    global _conflict_checked
+    if _conflict_checked:
+        return
+    _conflict_checked = True
+    clash = _conflicting_reviewer_key(hotkey)
+    if clash:
+        tooltip(tr("hotkey.conflict", hotkey=hotkey, conflict=clash))
 
 
 gui_hooks.reviewer_did_show_question.append(_install_shortcut)

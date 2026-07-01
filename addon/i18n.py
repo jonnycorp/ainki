@@ -21,6 +21,10 @@ CATALOG = {
     "en": {
         # menu / entry
         "menu.settings": "ainki Settings",
+        "hotkey.conflict": (
+            "ainki: hotkey '{hotkey}' clashes with Anki's reviewer key '{conflict}' — it "
+            "may not fire reliably. Change it in the add-on config."
+        ),
         # errors (llm / generation)
         "err.bad_key": "Invalid or expired API key. Check it in the add-on config.",
         "err.rate_limit": "Rate limited by the API. Wait a moment and try again.",
@@ -47,7 +51,9 @@ CATALOG = {
         "dlg.title": "AI Sentence Generator",
         "dlg.note_type": "Note type: <b>{name}</b>",
         "dlg.vocab_word": "Vocab word:",
-        "dlg.select_hint": "Select one or more (click, Ctrl-click, Shift-range; double-click to edit):",
+        "dlg.target_field": "Adds to: <b>{field}</b>",
+        "dlg.select_hint": "Click to toggle a sentence, Shift for a range.",
+        "dlg.list_tooltip": "Double-click to edit a sentence · right-click to revert it.",
         "dlg.generate": "Generate",
         "dlg.generate_more": "Generate More",
         "dlg.select_all": "Select all",
@@ -77,6 +83,7 @@ CATALOG = {
         "set.generation": "Generation",
         "set.level": "Learner level:",
         "set.count": "Sentences per generation:",
+        "set.font_size": "Sentence font size:",
         "set.style": "Style:",
         "set.style_casual": "Casual / spoken",
         "set.style_polite": "Polite (です/ます)",
@@ -108,6 +115,10 @@ CATALOG = {
     # --- Japanese (needs native-speaker review) ---------------------
     "ja": {
         "menu.settings": "ainki 設定",
+        "hotkey.conflict": (
+            "ainki：ホットキー「{hotkey}」がAnkiのレビュー用キー「{conflict}」と競合しています。"
+            "正しく動作しない場合があります。アドオン設定で変更してください。"
+        ),
         "err.bad_key": "APIキーが無効か期限切れです。アドオン設定で確認してください。",
         "err.rate_limit": "APIのレート制限に達しました。少し待ってから再試行してください。",
         "err.api_detail": "APIエラー（{code}）：{detail}",
@@ -132,7 +143,9 @@ CATALOG = {
         "dlg.title": "AI例文ジェネレーター",
         "dlg.note_type": "ノートタイプ：<b>{name}</b>",
         "dlg.vocab_word": "単語：",
-        "dlg.select_hint": "1つ以上選択してください（クリック、Ctrl+クリック、Shift+範囲選択／ダブルクリックで編集）：",
+        "dlg.target_field": "追加先：<b>{field}</b>",
+        "dlg.select_hint": "クリックで選択を切り替え、Shiftで範囲選択。",
+        "dlg.list_tooltip": "ダブルクリックで編集・右クリックで元に戻す。",
         "dlg.generate": "生成",
         "dlg.generate_more": "さらに生成",
         "dlg.select_all": "すべて選択",
@@ -161,6 +174,7 @@ CATALOG = {
         "set.generation": "生成",
         "set.level": "学習レベル：",
         "set.count": "1回の生成数：",
+        "set.font_size": "文の文字サイズ：",
         "set.style": "文体：",
         "set.style_casual": "カジュアル（話し言葉）",
         "set.style_polite": "丁寧（です・ます）",

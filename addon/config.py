@@ -67,6 +67,11 @@ def get_style() -> str:
     return _raw().get("style", "casual")
 
 
+def get_sentence_font_size() -> int:
+    """Point size for the candidate list — readability varies by device/DPI."""
+    return _raw().get("sentence_font_size", 18)
+
+
 def get_write_mode() -> str:
     """How a chosen sentence lands in the target field: 'append' or 'overwrite'."""
     return _raw().get("write_mode", "append")
