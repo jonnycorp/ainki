@@ -33,7 +33,7 @@ from aqt.qt import (
 from .. import config
 from ..i18n import tr, translate, resolve_lang
 
-_MODEL_PRESETS = ["claude-haiku-4-5", "claude-sonnet-4-6", "claude-opus-4-8"]
+_MODEL_PRESETS = ["claude-sonnet-4-6", "claude-haiku-4-5", "claude-opus-4-8"]
 _LEVEL_PRESETS = ["beginner", "intermediate", "advanced", "N5", "N4", "N3", "N2", "N1"]
 _SEPARATOR_PRESETS = ["<br>", "<br><br>"]
 
@@ -360,7 +360,7 @@ class SettingsDialog(QDialog):
         fg_idx = self.furigana_combo.findData(d.get("furigana_mode", "ruby"))
         self.furigana_combo.setCurrentIndex(fg_idx if fg_idx >= 0 else 1)
         self.furigana_template_edit.setText(d.get("furigana_template", "{kanji}[{reading}]"))
-        self.model_combo.setCurrentText(d.get("model", "claude-haiku-4-5"))
+        self.model_combo.setCurrentText(d.get("model", "claude-sonnet-4-6"))
         self._loading = False
         self._on_furigana_mode_changed()  # refresh template field enabled state
         self._retranslate(resolve_lang(self.language_combo.currentData()))

@@ -35,7 +35,7 @@ def get_provider_name() -> str:
 
 
 def get_model() -> str:
-    return _raw().get("model", "claude-haiku-4-5")
+    return _raw().get("model", "claude-sonnet-4-6")
 
 
 def get_api_key() -> str:

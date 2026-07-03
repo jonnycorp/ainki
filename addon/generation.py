@@ -10,7 +10,8 @@ Furigana readings come from the LLM we already call: a morphological analyzer
 (MeCab/fugashi/pykakasi) would violate the no-heavy-deps constraint, and the model
 disambiguates context-dependent readings (行った = いった / おこなった) better than a
 naive dictionary lookup. When furigana is enabled the model returns each sentence
-as tokens with readings + an `is_target` flag, and we render the wrapper locally.
+plus a token breakdown (readings + an `is_target` flag) and we render the wrapper
+locally — the sentence is written first so tokenisation can't corrupt its grammar.
 """
 
 import json
@@ -23,28 +24,52 @@ from .i18n import tr
 # Kanji (incl. CJK Ext-A) plus the iteration mark.
 _KANJI = re.compile(r"[㐀-䶿一-鿿々]")
 
-_SYSTEM_PLAIN = (
-    "You generate natural Japanese example sentences for a language learner. "
-    "The sentences must be natural, fit the requested register, and suit the "
-    "learner's stated level.\n\n"
-    "Respond with ONLY a JSON array — no prose, no markdown, no code fences. Each "
-    'element is an object: {"jp": "<the Japanese sentence>", "en": "<a short '
-    'English translation>"}. Every sentence must use the given vocabulary word.'
+# Shared rules — grammaticality and variety are the two things small models get
+# wrong here, so they lead.
+_RULES = (
+    "Rules:\n"
+    "- Grammatically correct, natural Japanese that fits the requested register and level.\n"
+    "- Conjugate the target word into whatever form the grammar needs; NEVER force its "
+    "dictionary form (誘う → 誘って / 誘った, not 誘うて / 誘うた).\n"
+    "- Every sentence must use the target word and depict a clearly different situation; "
+    "no two may share a scenario or sentence pattern.\n\n"
 )
 
+_SYSTEM_PLAIN = (
+    "You write natural Japanese example sentences for a language learner.\n\n"
+    + _RULES
+    + "Respond with ONLY a JSON array — no prose, no markdown, no code fences. Each "
+    'element: {"jp": "<the sentence>", "en": "<short English translation>"}.'
+)
+
+# Furigana schema writes the sentence FIRST (jp), then tokenises that sentence.
+# Deriving grammar from a token-only schema made the model preserve the target's
+# dictionary form and mangle conjugation — jp-first fixes that.
 _SYSTEM_FURIGANA = (
-    "You generate natural Japanese example sentences for a language learner. "
-    "The sentences must be natural, fit the requested register, and suit the "
-    "learner's stated level.\n\n"
-    "Respond with ONLY a JSON array — no prose, no markdown, no code fences. Each "
-    "element is an object with two keys:\n"
+    "You write natural Japanese example sentences for a language learner, then "
+    "tokenise each for furigana.\n\n"
+    + _RULES
+    + "Respond with ONLY a JSON array — no prose, no markdown, no code fences. Each "
+    "element has three keys:\n"
+    '  "jp": the finished sentence,\n'
     '  "en": a short English translation,\n'
-    '  "tokens": the sentence split into word-level tokens, in order. Each token is '
-    '{"text": "<surface text>", "reading": "<full hiragana reading of text, or empty '
-    'string if it contains no kanji>", "is_target": <true only for the token(s) that '
-    "are the target vocabulary word, else false>}.\n"
-    "Concatenating the token texts must reproduce the sentence exactly. Give a reading "
-    "for every token that contains kanji. Every sentence must use the target word."
+    '  "tokens": jp split into word-level tokens in order. Each token is '
+    '{"text", "reading", "is_target"}: reading is the FULL hiragana reading of text, '
+    "including any kana already in it (誘っ → さそっ, 新しい → あたらしい; empty when text has "
+    "no kanji); is_target is true for the token(s) carrying the target word even when "
+    "conjugated (target 誘う → mark 誘っ in 誘って).\n"
+    "Include punctuation as its own token. Concatenating the token texts must "
+    "reproduce jp exactly.\n\n"
+    "Example for the target word 誘う:\n"
+    '{"jp": "友達が映画に誘ってくれた。", "en": "A friend invited me to a movie.", '
+    '"tokens": [{"text": "友達", "reading": "ともだち", "is_target": false}, '
+    '{"text": "が", "reading": "", "is_target": false}, '
+    '{"text": "映画", "reading": "えいが", "is_target": false}, '
+    '{"text": "に", "reading": "", "is_target": false}, '
+    '{"text": "誘っ", "reading": "さそっ", "is_target": true}, '
+    '{"text": "て", "reading": "", "is_target": false}, '
+    '{"text": "くれた", "reading": "", "is_target": false}, '
+    '{"text": "。", "reading": "", "is_target": false}]}'
 )
 
 
@@ -77,9 +102,9 @@ def build_prompt(
         f"Target vocabulary word: {vocab}\n"
         f"Learner level: {level}\n"
         f"Register: {register}\n"
-        f"Where natural, vary the situations across the sentences (e.g. {topics}). "
-        f"Prioritise natural use of the target word over fitting a topic.\n"
-        f"Generate {n} sentences."
+        f"Draw on a range of everyday situations (e.g. {topics}); use a different one "
+        f"for each sentence.\n"
+        f"Generate {n} distinct sentences."
     )
     return system, user
 
@@ -136,15 +161,15 @@ def _parse_furigana(data: list) -> list[dict]:
         if not isinstance(entry, dict):
             continue
         tokens = _clean_tokens(entry.get("tokens"))
-        if not tokens:
+        # Trust the model's written sentence; fall back to the token join if absent.
+        jp = str(entry.get("jp", "")).strip() or "".join(t["text"] for t in tokens)
+        if not jp:
             continue
-        items.append(
-            {
-                "jp": "".join(t["text"] for t in tokens),
-                "en": str(entry.get("en", "")),
-                "tokens": tokens,
-            }
-        )
+        # If tokens don't reconstruct the sentence, drop furigana for this item
+        # rather than render readings against a mismatched string.
+        if tokens and "".join(t["text"] for t in tokens) != jp:
+            tokens = None
+        items.append({"jp": jp, "en": str(entry.get("en", "")), "tokens": tokens})
     if not items:
         raise llm.LLMError(tr("err.no_sentences"))
     return items

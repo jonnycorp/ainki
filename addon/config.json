@@ -2,7 +2,7 @@
   "hotkey": "Ctrl+Shift+E",
   "language": "auto",
   "provider": "anthropic",
-  "model": "claude-haiku-4-5",
+  "model": "claude-sonnet-4-6",
   "api_key": "",
   "level": "intermediate",
   "num_sentences": 5,
