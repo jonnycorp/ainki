@@ -29,8 +29,8 @@ _KANJI = re.compile(r"[㐀-䶿一-鿿々]")
 _RULES = (
     "Rules:\n"
     "- Grammatically correct, natural Japanese that fits the requested register and level.\n"
-    "- Conjugate the target word into whatever form the grammar needs; NEVER force its "
-    "dictionary form (誘う → 誘って / 誘った, not 誘うて / 誘うた).\n"
+    "- Conjugate the target word into whatever form the sentence needs — don't leave it "
+    "in dictionary form when the grammar calls for an inflected form.\n"
     "- Every sentence must use the target word and depict a clearly different situation; "
     "no two may share a scenario or sentence pattern.\n\n"
 )
@@ -55,21 +55,10 @@ _SYSTEM_FURIGANA = (
     '  "en": a short English translation,\n'
     '  "tokens": jp split into word-level tokens in order. Each token is '
     '{"text", "reading", "is_target"}: reading is the FULL hiragana reading of text, '
-    "including any kana already in it (誘っ → さそっ, 新しい → あたらしい; empty when text has "
-    "no kanji); is_target is true for the token(s) carrying the target word even when "
-    "conjugated (target 誘う → mark 誘っ in 誘って).\n"
-    "Include punctuation as its own token. Concatenating the token texts must "
-    "reproduce jp exactly.\n\n"
-    "Example for the target word 誘う:\n"
-    '{"jp": "友達が映画に誘ってくれた。", "en": "A friend invited me to a movie.", '
-    '"tokens": [{"text": "友達", "reading": "ともだち", "is_target": false}, '
-    '{"text": "が", "reading": "", "is_target": false}, '
-    '{"text": "映画", "reading": "えいが", "is_target": false}, '
-    '{"text": "に", "reading": "", "is_target": false}, '
-    '{"text": "誘っ", "reading": "さそっ", "is_target": true}, '
-    '{"text": "て", "reading": "", "is_target": false}, '
-    '{"text": "くれた", "reading": "", "is_target": false}, '
-    '{"text": "。", "reading": "", "is_target": false}]}'
+    "including any kana already in it (e.g. 新しい → あたらしい; empty when text has no "
+    "kanji); is_target is true for the token(s) carrying the target word, even when it "
+    "appears in a conjugated form. Include punctuation as its own token. Concatenating "
+    "the token texts must reproduce jp exactly."
 )
 
 
