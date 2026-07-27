@@ -80,9 +80,13 @@ def get_append_separator() -> str:
     return _raw().get("append_separator", "<br>")
 
 
+# The author's support link — a constant, not user config: a stale "" persisted
+# in meta.json would silently override any config.json default and hide the link.
+DONATION_URL = "https://ko-fi.com/yunjay"
+
+
 def get_donation_url() -> str:
-    """Optional support/donation link shown in settings. Blank by default."""
-    return _raw().get("donation_url", "")
+    return DONATION_URL
 
 
 def get_furigana_mode() -> str:

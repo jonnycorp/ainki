@@ -8,9 +8,6 @@ from aqt.qt import (
     QDialog,
     QDialogButtonBox,
     QFormLayout,
-    QFrame,
-    QGroupBox,
-    QHBoxLayout,
     QLabel,
     QLineEdit,
     QSpinBox,
@@ -72,7 +69,7 @@ class SettingsDialog(QDialog):
 
         # Default size on first open; restoreGeom reinstates the user's last
         # geometry (no-op until one has been saved).
-        self.resize(470, 640)
+        self.resize(450, 480)
         restoreGeom(self, _GEOM_KEY)
 
     def done(self, result):
@@ -97,16 +94,13 @@ class SettingsDialog(QDialog):
     def _build_general_tab(self) -> QWidget:
         tab = QWidget()
         layout = QVBoxLayout(tab)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(6)
 
-        intro = QLabel()
-        self._reg(intro.setText, "set.intro")
-        layout.addWidget(intro)
+        form = QFormLayout()
+        form.setContentsMargins(0, 0, 0, 0)
+        form.setVerticalSpacing(6)
 
-        layout.addWidget(self._build_donation_box())
-
-        # Language
-        lang_group = QGroupBox()
-        lang_form = QFormLayout(lang_group)
         self.language_combo = QComboBox()
         self.language_combo.addItem("", "auto")
         self.language_combo.addItem("English", "en")
@@ -116,30 +110,18 @@ class SettingsDialog(QDialog):
         self.language_combo.setCurrentIndex(lang_idx if lang_idx >= 0 else 0)
         # Connect after setting the index so construction doesn't trigger it.
         qconnect(self.language_combo.currentIndexChanged, self._on_language_changed)
-        lang_lbl = QLabel()
-        self._reg(lang_lbl.setText, "set.language")
-        lang_form.addRow(lang_lbl, self.language_combo)
-        layout.addWidget(lang_group)
+        self._add_row(form, "set.language", self.language_combo)
 
-        # Field mapping
-        mapping_group = QGroupBox()
-        self._reg(mapping_group.setTitle, "set.field_mapping")
-        mapping_form = QFormLayout(mapping_group)
         self.note_type_combo = QComboBox()
         qconnect(self.note_type_combo.currentTextChanged, self._on_note_type_changed)
         self.source_combo = QComboBox()
         self.target_combo = QComboBox()
         qconnect(self.source_combo.currentTextChanged, self._on_field_changed)
         qconnect(self.target_combo.currentTextChanged, self._on_field_changed)
-        self._add_row(mapping_form, "set.note_type", self.note_type_combo)
-        self._add_row(mapping_form, "set.word_field", self.source_combo)
-        self._add_row(mapping_form, "set.append_to", self.target_combo)
-        layout.addWidget(mapping_group)
+        self._add_row(form, "set.note_type", self.note_type_combo)
+        self._add_row(form, "set.word_field", self.source_combo)
+        self._add_row(form, "set.append_to", self.target_combo)
 
-        # Append behaviour
-        append_group = QGroupBox()
-        self._reg(append_group.setTitle, "set.when_adding")
-        append_form = QFormLayout(append_group)
         self.mode_combo = QComboBox()
         self.mode_combo.addItem("", "append")
         self.mode_combo.addItem("", "overwrite")
@@ -151,17 +133,9 @@ class SettingsDialog(QDialog):
         self.sep_combo.setEditable(True)
         self.sep_combo.addItems(_SEPARATOR_PRESETS)
         self.sep_combo.setCurrentText(config.get_append_separator())
-        self._add_row(append_form, "set.mode", self.mode_combo)
-        self._add_row(append_form, "set.separator", self.sep_combo)
-        sep_hint = QLabel()
-        self._reg(sep_hint.setText, "set.separator_hint")
-        append_form.addRow("", sep_hint)
-        layout.addWidget(append_group)
+        self._add_row(form, "set.mode", self.mode_combo)
+        self._add_row(form, "set.separator", self.sep_combo)
 
-        # Generation
-        gen_group = QGroupBox()
-        self._reg(gen_group.setTitle, "set.generation")
-        gen_form = QFormLayout(gen_group)
         self.level_combo = QComboBox()
         self.level_combo.setEditable(True)
         self.level_combo.addItems(_LEVEL_PRESETS)
@@ -178,16 +152,11 @@ class SettingsDialog(QDialog):
             self._reg(lambda t, i=i: self.style_combo.setItemText(i, t), f"set.style_{value}")
         style_idx = self.style_combo.findData(config.get_style())
         self.style_combo.setCurrentIndex(style_idx if style_idx >= 0 else 0)
-        self._add_row(gen_form, "set.level", self.level_combo)
-        self._add_row(gen_form, "set.style", self.style_combo)
-        self._add_row(gen_form, "set.count", self.count_spin)
-        self._add_row(gen_form, "set.font_size", self.font_spin)
-        layout.addWidget(gen_group)
+        self._add_row(form, "set.level", self.level_combo)
+        self._add_row(form, "set.style", self.style_combo)
+        self._add_row(form, "set.count", self.count_spin)
+        self._add_row(form, "set.font_size", self.font_spin)
 
-        # Furigana
-        fg_group = QGroupBox()
-        self._reg(fg_group.setTitle, "set.furigana")
-        fg_form = QFormLayout(fg_group)
         self.furigana_combo = QComboBox()
         for i, (value, key) in enumerate(
             (("off", "set.furigana_off"), ("ruby", "set.furigana_ruby"), ("custom", "set.furigana_custom"))
@@ -198,15 +167,23 @@ class SettingsDialog(QDialog):
         self.furigana_combo.setCurrentIndex(fg_idx if fg_idx >= 0 else 1)
         qconnect(self.furigana_combo.currentIndexChanged, self._on_furigana_mode_changed)
         self.furigana_template_edit = QLineEdit(config.get_furigana_template())
-        self._add_row(fg_form, "set.mode", self.furigana_combo)
-        self._add_row(fg_form, "set.custom_wrapper", self.furigana_template_edit)
-        fg_hint = QLabel()
-        self._reg(fg_hint.setText, "set.furigana_hint")
-        fg_form.addRow("", fg_hint)
-        layout.addWidget(fg_group)
-        self._on_furigana_mode_changed()  # set initial enabled state
+        self._add_row(form, "set.furigana", self.furigana_combo)
+        self._add_row(form, "set.custom_wrapper", self.furigana_template_edit)
+
+        layout.addLayout(form)
+        layout.addSpacing(16)
+
+        # Ko-fi link — plain centered label, no box.
+        url = config.get_donation_url()
+        donate = QLabel()
+        self._reg(lambda t, u=url: donate.setText(f'<a href="{u}">{t}</a>'), "set.donate")
+        donate.setOpenExternalLinks(True)
+        donate.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
+        donate.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(donate)
 
         layout.addStretch()
+        self._on_furigana_mode_changed()  # set initial enabled state
         return tab
 
     def _add_row(self, form, key: str, widget):
@@ -217,23 +194,6 @@ class SettingsDialog(QDialog):
 
     def _on_furigana_mode_changed(self, *_):
         self.furigana_template_edit.setEnabled(self.furigana_combo.currentData() == "custom")
-
-    def _build_donation_box(self) -> QWidget:
-        box = QGroupBox()
-        self._reg(box.setTitle, "set.support")
-        box.setObjectName("ainkiDonationBox")
-        inner = QVBoxLayout(box)
-        url = config.get_donation_url()
-        label = QLabel()
-        if url:
-            self._reg(lambda t, u=url: label.setText(f'<a href="{u}">{t}</a>'), "set.donate")
-            label.setOpenExternalLinks(True)
-            label.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
-        else:
-            self._reg(label.setText, "set.support_coming")
-        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        inner.addWidget(label)
-        return box
 
     # --- API Key tab ------------------------------------------------------
 

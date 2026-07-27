@@ -57,21 +57,14 @@ CATALOG = {
         "set.title": "ainki Settings",
         "set.tab_general": "General",
         "set.tab_api": "API Key",
-        "set.intro": "<b>ainki</b> — AI example sentences for your reviews.",
-        "set.support": "Support",
-        "set.support_coming": "<span style='color:gray;'>(support link coming soon)</span>",
         "set.donate": "Buy me a coffee ☕",
-        "set.field_mapping": "Field mapping",
         "set.note_type": "Note type:",
         "set.word_field": "Word field:",
         "set.append_to": "Append sentences to:",
-        "set.when_adding": "When adding a sentence",
         "set.mode": "Mode:",
         "set.mode_append": "Append to existing content",
         "set.mode_overwrite": "Overwrite the field",
         "set.separator": "Separator (HTML):",
-        "set.separator_hint": "<span style='color:gray;'>Fields are HTML — use &lt;br&gt; for a line break.</span>",
-        "set.generation": "Generation",
         "set.level": "Learner level:",
         "set.count": "Sentences per generation:",
         "set.font_size": "Sentence font size:",
@@ -86,12 +79,6 @@ CATALOG = {
         "set.furigana_ruby": "Ruby (HTML, works on any template)",
         "set.furigana_custom": "Custom wrapper",
         "set.custom_wrapper": "Custom wrapper:",
-        "set.furigana_hint": (
-            "<span style='color:gray;'>Use {kanji} and {reading}. "
-            "e.g. <code>{kanji}[{reading}]</code> or "
-            "<code>&lt;ruby&gt;{kanji}&lt;rt&gt;{reading}&lt;/rt&gt;&lt;/ruby&gt;</code>. "
-            "The target word is always left bare.</span>"
-        ),
         "set.api_key": "API key:",
         "set.api_key_note": (
             "<span style='color:gray;'>Stored in plaintext on disk. "
@@ -147,21 +134,14 @@ CATALOG = {
         "set.title": "ainki 設定",
         "set.tab_general": "一般",
         "set.tab_api": "APIキー",
-        "set.intro": "<b>ainki</b> — レビュー用のAI例文。",
-        "set.support": "サポート",
-        "set.support_coming": "<span style='color:gray;'>（サポートリンクは近日公開）</span>",
         "set.donate": "開発者を応援する ☕",
-        "set.field_mapping": "フィールド対応",
         "set.note_type": "ノートタイプ：",
         "set.word_field": "単語フィールド：",
         "set.append_to": "例文の追加先：",
-        "set.when_adding": "例文を追加するとき",
         "set.mode": "モード：",
         "set.mode_append": "既存の内容に追加",
         "set.mode_overwrite": "フィールドを上書き",
         "set.separator": "区切り（HTML）：",
-        "set.separator_hint": "<span style='color:gray;'>フィールドはHTMLです — 改行には &lt;br&gt; を使います。</span>",
-        "set.generation": "生成",
         "set.level": "学習レベル：",
         "set.count": "1回の生成数：",
         "set.font_size": "文の文字サイズ：",
@@ -176,12 +156,6 @@ CATALOG = {
         "set.furigana_ruby": "ルビ（HTML・どのテンプレートでも動作）",
         "set.furigana_custom": "カスタム書式",
         "set.custom_wrapper": "カスタム書式：",
-        "set.furigana_hint": (
-            "<span style='color:gray;'>{kanji} と {reading} を使います。"
-            "例：<code>{kanji}[{reading}]</code> または "
-            "<code>&lt;ruby&gt;{kanji}&lt;rt&gt;{reading}&lt;/rt&gt;&lt;/ruby&gt;</code>。"
-            "対象の単語には常にふりがなを付けません。</span>"
-        ),
         "set.api_key": "APIキー：",
         "set.api_key_note": (
             "<span style='color:gray;'>キーはディスクに平文で保存されます。"
@@ -232,7 +206,7 @@ def current_lang() -> str:
 def translate(key: str, lang: str, **kwargs) -> str:
     """Translate `key` into an explicit language (used for live preview, where
     the chosen language isn't saved yet). Interpolates only when kwargs are
-    passed, so strings with literal braces ({kanji}/{reading}) stay intact."""
+    passed, so plain strings can safely contain literal braces."""
     text = CATALOG.get(lang, {}).get(key) or CATALOG[_DEFAULT].get(key, key)
     if kwargs:
         try:
