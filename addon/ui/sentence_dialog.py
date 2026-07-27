@@ -1,19 +1,6 @@
 """
-Popup shown when the hotkey fires during review.
-
-Generation is an explicit button press. The LLM call runs off the Qt main thread
-via QueryOp (CLAUDE.md hard constraint #2) — the worker only does network work and
-never touches widgets; results come back through the success callback.
-
-Candidate list:
-- Multi-select. Selection is the source of truth and a checkbox mirrors it, so you
-  can pick with normal click / Ctrl-click / Shift-range on the easy-to-hit row, or
-  click the checkbox — both stay in sync.
-- Double-click to edit a sentence; the original is kept for a right-click Revert.
-- Add to Card appends every selected sentence (in list order) using the configured
-  separator. Unedited sentences get furigana (rendered from the model's tokens);
-  edited ones are written as-is, since we can't re-derive accurate readings for
-  hand-typed text.
+Popup shown when the hotkey fires during review: generate sentences, pick some,
+inject into the target field. Generation runs off the Qt main thread via QueryOp.
 """
 
 from aqt import mw
@@ -36,6 +23,7 @@ from aqt.qt import (
 from aqt.utils import showWarning
 
 from .. import config, generation
+from ..i18n import tr
 
 _ITEM_FLAGS = (
     Qt.ItemFlag.ItemIsSelectable
@@ -51,7 +39,6 @@ class SentenceDialog(QDialog):
         parent,
         vocab_word: str,
         note_type_name: str,
-        mapping_is_default: bool,
         note,
         target_field: str,
     ):
@@ -62,27 +49,27 @@ class SentenceDialog(QDialog):
         self._vocab = vocab_word
         self._syncing = False  # guards selection<->checkbox mirroring
 
-        self.setWindowTitle("AI Sentence Generator")
+        self.setWindowTitle(tr("dlg.title"))
         self.setMinimumWidth(540)
         self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowCloseButtonHint)
 
         layout = QVBoxLayout(self)
 
-        info_label = QLabel(f"Note type: <b>{note_type_name}</b>")
-        if mapping_is_default:
-            info_label.setText(
-                info_label.text()
-                + ' <span style="color:#c80;">(using default field mapping — configure in settings)</span>'
-            )
-        layout.addWidget(info_label)
+        layout.addWidget(QLabel(tr("dlg.note_type", name=note_type_name)))
+        layout.addWidget(QLabel(tr("dlg.target_field", field=target_field)))
 
-        layout.addWidget(QLabel("Vocab word:"))
+        layout.addWidget(QLabel(tr("dlg.vocab_word")))
         self.word_input = QLineEdit(vocab_word)
         layout.addWidget(self.word_input)
 
-        layout.addWidget(QLabel("Select one or more (click, Ctrl-click, Shift-range; double-click to edit):"))
+        layout.addWidget(QLabel(tr("dlg.select_hint")))
         self.sentence_list = QListWidget()
-        self.sentence_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        list_font = self.sentence_list.font()
+        list_font.setPointSize(config.get_sentence_font_size())
+        self.sentence_list.setFont(list_font)
+        self.sentence_list.setToolTip(tr("dlg.list_tooltip"))
+        # MultiSelection: each click toggles a row, no Ctrl needed.
+        self.sentence_list.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
         self.sentence_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         qconnect(self.sentence_list.itemSelectionChanged, self._on_selection_changed)
         qconnect(self.sentence_list.itemChanged, self._on_item_changed)
@@ -91,35 +78,32 @@ class SentenceDialog(QDialog):
         layout.addWidget(self.sentence_list)
 
         btn_row = QHBoxLayout()
-        self.generate_btn = QPushButton("Generate")
-        self.generate_more_btn = QPushButton("Generate More")
-        self.generate_more_btn.setEnabled(False)
-        self.select_all_btn = QPushButton("Select all")
+        self.generate_btn = QPushButton(tr("dlg.generate"))
+        self.generate_btn.setDefault(True)
+        self.select_all_btn = QPushButton(tr("dlg.select_all"))
         self.select_all_btn.setEnabled(False)
-        self.add_btn = QPushButton("Add to Card")
+        self.add_btn = QPushButton(tr("dlg.add_to_card"))
         self.add_btn.setEnabled(False)
-        self.cancel_btn = QPushButton("Cancel")
+        self.cancel_btn = QPushButton(tr("dlg.cancel"))
 
         btn_row.addWidget(self.generate_btn)
-        btn_row.addWidget(self.generate_more_btn)
         btn_row.addWidget(self.select_all_btn)
         btn_row.addStretch()
         btn_row.addWidget(self.add_btn)
         btn_row.addWidget(self.cancel_btn)
         layout.addLayout(btn_row)
 
-        qconnect(self.generate_btn.clicked, lambda: self._on_generate(append=False))
-        qconnect(self.generate_more_btn.clicked, lambda: self._on_generate(append=True))
+        qconnect(self.generate_btn.clicked, self._on_generate)
         qconnect(self.select_all_btn.clicked, lambda: self.sentence_list.selectAll())
         qconnect(self.add_btn.clicked, self._on_add)
         qconnect(self.cancel_btn.clicked, self.reject)
 
     # --- generation -------------------------------------------------------
 
-    def _on_generate(self, append: bool):
+    def _on_generate(self):
         vocab = self.word_input.text().strip()
         if not vocab:
-            showWarning("Enter a vocab word to generate sentences for.")
+            showWarning(tr("dlg.enter_vocab"))
             return
         self._vocab = vocab
 
@@ -129,17 +113,15 @@ class SentenceDialog(QDialog):
 
         op = QueryOp(
             parent=self,
-            # Runs off the main thread; ignores `col`, only does network work.
+            # Off-main-thread; ignores `col`, only does network work.
             op=lambda col: generation.generate_sentences(vocab, level, n),
-            success=lambda items: self._on_generated(items, append=append),
+            success=self._on_generated,
         )
-        op.failure(self._on_error).with_progress("Generating sentences…").run_in_background()
+        op.failure(self._on_error).with_progress(tr("dlg.generating")).run_in_background()
 
-    def _on_generated(self, items: list[dict], append: bool):
+    def _on_generated(self, items: list[dict]):
         self._set_busy(False)
-        if not append:
-            self._items = []
-            self.sentence_list.clear()
+        was_empty = not self._items
 
         self._syncing = True
         self.sentence_list.blockSignals(True)
@@ -155,10 +137,10 @@ class SentenceDialog(QDialog):
         self._syncing = False
 
         self.sentence_list.setEnabled(True)
-        self.generate_more_btn.setEnabled(True)
         self.select_all_btn.setEnabled(bool(self._items))
-        if not append and self._items:
-            self.sentence_list.setCurrentRow(0)  # select first → mirrors check, enables Add
+        self.generate_btn.setText(tr("dlg.generate_more"))
+        if was_empty and self._items:
+            self.sentence_list.item(0).setSelected(True)
 
     def _on_error(self, exc: Exception):
         self._set_busy(False)
@@ -166,7 +148,6 @@ class SentenceDialog(QDialog):
 
     def _set_busy(self, busy: bool):
         self.generate_btn.setEnabled(not busy)
-        self.generate_more_btn.setEnabled(not busy and bool(self._items))
 
     # --- selection <-> checkbox mirroring --------------------------------
 
@@ -185,8 +166,7 @@ class SentenceDialog(QDialog):
         self._update_add_enabled()
 
     def _on_item_changed(self, item: QListWidgetItem):
-        # Fires for a checkbox toggle or a committed text edit. Keep selection in
-        # step with the checkbox; edit state is derived later at add time.
+        # Fires for both checkbox toggles and committed text edits.
         if self._syncing:
             return
         self._syncing = True
@@ -207,7 +187,7 @@ class SentenceDialog(QDialog):
             return
         row = self.sentence_list.row(item)
         menu = QMenu(self)
-        revert = menu.addAction("Revert to original")
+        revert = menu.addAction(tr("dlg.revert"))
         revert.setEnabled(item.text() != self._items[row]["jp"])
         chosen = menu.exec(self.sentence_list.mapToGlobal(pos))
         if chosen is revert:
@@ -225,11 +205,13 @@ class SentenceDialog(QDialog):
             return
 
         if self.target_field not in self.note:
-            note_type_name = self.note.note_type()["name"]
             showWarning(
-                f"Target field '{self.target_field}' not found on note type "
-                f"'{note_type_name}'.\n\nAvailable fields: {', '.join(self.note.keys())}\n\n"
-                "Configure field mappings in the add-on settings."
+                tr(
+                    "err.target_not_found",
+                    field=self.target_field,
+                    note_type=self.note.note_type()["name"],
+                    fields=", ".join(self.note.keys()),
+                )
             )
             return
 
@@ -266,6 +248,5 @@ class SentenceDialog(QDialog):
             else:
                 mw.reviewer._showQuestion()
         except Exception:
-            # Persisted regardless; a refresh hiccup shouldn't crash the flow.
-            pass
+            pass  # already persisted; a refresh hiccup shouldn't crash the flow
         self.accept()

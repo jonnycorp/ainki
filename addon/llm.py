@@ -1,14 +1,8 @@
 """
-BYOK LLM client. Provider-agnostic by design — `get_provider()` is the single
-swap seam, so new providers slot in without the dialog or trigger knowing which
-one is active.
+BYOK LLM client. `get_provider()` is the single provider-swap seam.
 
-Talks to the API with stdlib `urllib` only. The official SDKs pull in heavy,
-platform-specific dependencies (httpx, pydantic-core) that can't ship cleanly
-inside the add-on zip, so we hand-roll the request instead (CLAUDE.md hard
-constraint #1).
-
-The API key is plaintext BYOK config. Never log it, never put it in a URL.
+Uses stdlib `urllib`, not the official SDK — its native deps (httpx,
+pydantic-core) can't ship inside the add-on zip. Never log the key.
 """
 
 import json
@@ -16,6 +10,7 @@ import urllib.error
 import urllib.request
 
 from . import config
+from .i18n import tr
 
 
 class LLMError(Exception):
@@ -39,8 +34,7 @@ class AnthropicProvider:
             {
                 "model": self._model,
                 "max_tokens": max_tokens,
-                # No `thinking`: it's off by default on current models and adds
-                # latency we don't want mid-review. (`budget_tokens` would 400.)
+                # No `thinking` param: off by default, and it adds mid-review latency.
                 "system": system,
                 "messages": [{"role": "user", "content": user}],
             }
@@ -63,9 +57,9 @@ class AnthropicProvider:
         except urllib.error.HTTPError as err:
             raise _http_error(err) from err
         except urllib.error.URLError as err:
-            raise LLMError(f"Network error reaching the API: {err.reason}") from err
+            raise LLMError(tr("err.network", reason=err.reason)) from err
         except TimeoutError as err:
-            raise LLMError("The request timed out. Check your connection and retry.") from err
+            raise LLMError(tr("err.timeout")) from err
 
         return _extract_text(body)
 
@@ -73,9 +67,9 @@ class AnthropicProvider:
 def _http_error(err: urllib.error.HTTPError) -> LLMError:
     """Map an HTTP failure to a clear, key-safe message."""
     if err.code == 401:
-        return LLMError("Invalid or expired API key. Check it in the add-on config.")
+        return LLMError(tr("err.bad_key"))
     if err.code == 429:
-        return LLMError("Rate limited by the API. Wait a moment and try again.")
+        return LLMError(tr("err.rate_limit"))
 
     # For 400 and other codes, surface the provider's own message when present.
     detail = ""
@@ -85,15 +79,15 @@ def _http_error(err: urllib.error.HTTPError) -> LLMError:
     except (ValueError, AttributeError, OSError):
         pass
     if detail:
-        return LLMError(f"API error ({err.code}): {detail}")
-    return LLMError(f"API error ({err.code}).")
+        return LLMError(tr("err.api_detail", code=err.code, detail=detail))
+    return LLMError(tr("err.api", code=err.code))
 
 
 def _extract_text(body: dict) -> str:
     blocks = body.get("content", [])
     text = "".join(b.get("text", "") for b in blocks if b.get("type") == "text")
     if not text.strip():
-        raise LLMError("The model returned an empty response.")
+        raise LLMError(tr("err.empty"))
     return text
 
 
@@ -103,6 +97,6 @@ def get_provider():
     if name == "anthropic":
         api_key = config.get_api_key()
         if not api_key:
-            raise LLMError("No API key set. Add your key in the add-on config.")
+            raise LLMError(tr("err.no_key"))
         return AnthropicProvider(api_key=api_key, model=config.get_model())
-    raise LLMError(f"Unknown provider '{name}'. Set 'provider' in the add-on config.")
+    raise LLMError(tr("err.unknown_provider", name=name))

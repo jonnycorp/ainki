@@ -22,7 +22,13 @@ def _save(cfg: dict) -> None:
 
 
 def get_hotkey() -> str:
-    return _raw().get("hotkey", "Ctrl+E")
+    # Ctrl+Shift+E — plain Ctrl+E collides with Anki's export shortcut.
+    return _raw().get("hotkey", "Ctrl+Shift+E")
+
+
+def get_language() -> str:
+    """UI language: 'auto' (follow Anki), or a base code like 'en' / 'ja'."""
+    return _raw().get("language", "auto")
 
 
 def get_provider_name() -> str:
@@ -30,21 +36,17 @@ def get_provider_name() -> str:
 
 
 def get_model() -> str:
-    return _raw().get("model", "claude-haiku-4-5")
+    return _raw().get("model", "claude-sonnet-4-6")
 
 
 def get_api_key() -> str:
-    """
-    Plaintext BYOK key. Config value wins; falls back to the ANTHROPIC_API_KEY
-    env var (a dev/testing convenience — only inherited when Anki is launched
-    from the terminal that exported it). Never log this value.
-    """
+    """Config value wins; ANTHROPIC_API_KEY env var is a dev fallback.
+    Never log this value."""
     return _raw().get("api_key", "") or os.environ.get("ANTHROPIC_API_KEY", "")
 
 
 def get_raw_api_key() -> str:
-    """The configured key only (no env fallback) — for prefilling the settings
-    field, so an env-supplied secret is never rendered into the UI."""
+    """No env fallback — so an env-supplied secret is never rendered into the UI."""
     return _raw().get("api_key", "")
 
 
@@ -55,6 +57,16 @@ def get_level() -> str:
 
 def get_num_sentences() -> int:
     return _raw().get("num_sentences", 5)
+
+
+def get_style() -> str:
+    """Register injected into the prompt: casual / polite / news / business / mixed."""
+    return _raw().get("style", "casual")
+
+
+def get_sentence_font_size() -> int:
+    """Point size for the candidate list — readability varies by device/DPI."""
+    return _raw().get("sentence_font_size", 18)
 
 
 def get_write_mode() -> str:
@@ -125,3 +137,11 @@ def save_settings(updates: dict) -> None:
     cfg = _raw()
     cfg.update(updates)
     _save(cfg)
+
+
+def defaults() -> dict:
+    """The add-on's config.json defaults (for 'Restore defaults')."""
+    try:
+        return mw.addonManager.addonConfigDefaults(_pkg()) or {}
+    except Exception:
+        return {}
