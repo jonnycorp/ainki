@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 .vscode/
 meta.json
+dist/

@@ -22,7 +22,8 @@ def _save(cfg: dict) -> None:
 
 
 def get_hotkey() -> str:
-    return _raw().get("hotkey", "Ctrl+E")
+    # Ctrl+Shift+E — plain Ctrl+E collides with Anki's export shortcut.
+    return _raw().get("hotkey", "Ctrl+Shift+E")
 
 
 def get_language() -> str:
@@ -39,17 +40,13 @@ def get_model() -> str:
 
 
 def get_api_key() -> str:
-    """
-    Plaintext BYOK key. Config value wins; falls back to the ANTHROPIC_API_KEY
-    env var (a dev/testing convenience — only inherited when Anki is launched
-    from the terminal that exported it). Never log this value.
-    """
+    """Config value wins; ANTHROPIC_API_KEY env var is a dev fallback.
+    Never log this value."""
     return _raw().get("api_key", "") or os.environ.get("ANTHROPIC_API_KEY", "")
 
 
 def get_raw_api_key() -> str:
-    """The configured key only (no env fallback) — for prefilling the settings
-    field, so an env-supplied secret is never rendered into the UI."""
+    """No env fallback — so an env-supplied secret is never rendered into the UI."""
     return _raw().get("api_key", "")
 
 

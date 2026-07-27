@@ -1,13 +1,6 @@
 """
-Popup shown when the hotkey fires during review.
-
-- Multi-select list (MultiSelection): each click toggles a row on/off, Shift for a
-  range; a checkbox mirrors the selection. Font size is set in the add-on settings.
-- Double-click a row to edit it, right-click to revert — surfaced via the list tooltip.
-- Add to Card appends every selected sentence (in list order) using the configured
-  separator; the header shows the target field it writes to.
-- Generation runs off the Qt main thread via QueryOp (CLAUDE.md #2) — the worker only
-  does network work; results come back through the success callback.
+Popup shown when the hotkey fires during review: generate sentences, pick some,
+inject into the target field. Generation runs off the Qt main thread via QueryOp.
 """
 
 from aqt import mw
@@ -63,7 +56,6 @@ class SentenceDialog(QDialog):
         layout = QVBoxLayout(self)
 
         layout.addWidget(QLabel(tr("dlg.note_type", name=note_type_name)))
-        # Make the write target visible — sentences land in this field.
         layout.addWidget(QLabel(tr("dlg.target_field", field=target_field)))
 
         layout.addWidget(QLabel(tr("dlg.vocab_word")))
@@ -72,12 +64,11 @@ class SentenceDialog(QDialog):
 
         layout.addWidget(QLabel(tr("dlg.select_hint")))
         self.sentence_list = QListWidget()
-        # Configurable point size — Japanese reads small, and DPI varies by device.
         list_font = self.sentence_list.font()
         list_font.setPointSize(config.get_sentence_font_size())
         self.sentence_list.setFont(list_font)
-        self.sentence_list.setToolTip(tr("dlg.list_tooltip"))  # edit / revert hint
-        # MultiSelection: each click toggles a row (no Ctrl needed), like the checkbox.
+        self.sentence_list.setToolTip(tr("dlg.list_tooltip"))
+        # MultiSelection: each click toggles a row, no Ctrl needed.
         self.sentence_list.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
         self.sentence_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         qconnect(self.sentence_list.itemSelectionChanged, self._on_selection_changed)
@@ -122,7 +113,7 @@ class SentenceDialog(QDialog):
 
         op = QueryOp(
             parent=self,
-            # Runs off the main thread; ignores `col`, only does network work.
+            # Off-main-thread; ignores `col`, only does network work.
             op=lambda col: generation.generate_sentences(vocab, level, n),
             success=self._on_generated,
         )
@@ -149,7 +140,6 @@ class SentenceDialog(QDialog):
         self.select_all_btn.setEnabled(bool(self._items))
         self.generate_btn.setText(tr("dlg.generate_more"))
         if was_empty and self._items:
-            # Explicit select (MultiSelection): mirrors the checkbox and enables Add.
             self.sentence_list.item(0).setSelected(True)
 
     def _on_error(self, exc: Exception):
@@ -176,8 +166,7 @@ class SentenceDialog(QDialog):
         self._update_add_enabled()
 
     def _on_item_changed(self, item: QListWidgetItem):
-        # Fires for a checkbox toggle or a committed text edit. Keep selection in
-        # step with the checkbox; edit state is derived later at add time.
+        # Fires for both checkbox toggles and committed text edits.
         if self._syncing:
             return
         self._syncing = True
@@ -259,6 +248,5 @@ class SentenceDialog(QDialog):
             else:
                 mw.reviewer._showQuestion()
         except Exception:
-            # Persisted regardless; a refresh hiccup shouldn't crash the flow.
-            pass
+            pass  # already persisted; a refresh hiccup shouldn't crash the flow
         self.accept()

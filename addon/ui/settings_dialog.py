@@ -1,14 +1,5 @@
 """
-Settings dialog — the configuration surface for users. Opened from
-Tools → ainki Settings (and the add-on's Config button)
-
-Tabs:
-- General — donation placeholder, per-note-type field mapping (real fields via
-  dropdowns), append behaviour, and generation parameters.
-- API Key — the BYOK key (masked), provider, and model.
-
-Plain aqt.qt widgets and group boxes: intentionally restrained styling, named so
-later visual polish (stylesheets) has clean hooks.
+Settings dialog, opened from Tools → ainki Settings and the add-on's Config button.
 """
 
 from aqt import mw
@@ -30,8 +21,13 @@ from aqt.qt import (
     qconnect,
 )
 
+from aqt.utils import saveGeom, restoreGeom
+
 from .. import config
 from ..i18n import tr, translate, resolve_lang
+
+# Anki profile key for this window's saved size/position.
+_GEOM_KEY = "ainkiSettings"
 
 _MODEL_PRESETS = ["claude-sonnet-4-6", "claude-haiku-4-5", "claude-opus-4-8"]
 _LEVEL_PRESETS = ["beginner", "intermediate", "advanced", "N5", "N4", "N3", "N2", "N1"]
@@ -41,7 +37,7 @@ _SEPARATOR_PRESETS = ["<br>", "<br><br>"]
 class SettingsDialog(QDialog):
     def __init__(self, parent):
         super().__init__(parent)
-        self.setMinimumWidth(520)
+        self.setMinimumWidth(440)
 
         self._i18n = []  # (setter, key) pairs for live retranslation
         # Staged field mappings — edits accumulate here, written on Save.
@@ -74,6 +70,16 @@ class SettingsDialog(QDialog):
 
         self._load_note_types()
 
+        # Default size on first open; restoreGeom reinstates the user's last
+        # geometry (no-op until one has been saved).
+        self.resize(470, 640)
+        restoreGeom(self, _GEOM_KEY)
+
+    def done(self, result):
+        # done() covers every close path (OK, Cancel, window close).
+        saveGeom(self, _GEOM_KEY)
+        super().done(result)
+
     # --- live translation -------------------------------------------------
 
     def _reg(self, setter, key: str):
@@ -92,15 +98,13 @@ class SettingsDialog(QDialog):
         tab = QWidget()
         layout = QVBoxLayout(tab)
 
-        # Top line
         intro = QLabel()
         self._reg(intro.setText, "set.intro")
         layout.addWidget(intro)
 
-        # Donation placeholder — reserved space, blank until a URL is configured.
         layout.addWidget(self._build_donation_box())
 
-        # Language — default follows Anki; override pins the add-on's language.
+        # Language
         lang_group = QGroupBox()
         lang_form = QFormLayout(lang_group)
         self.language_combo = QComboBox()
@@ -165,7 +169,7 @@ class SettingsDialog(QDialog):
         self.count_spin = QSpinBox()
         self.count_spin.setRange(1, 20)
         self.count_spin.setValue(config.get_num_sentences())
-        self.font_spin = QSpinBox()  # candidate-list point size; device-dependent
+        self.font_spin = QSpinBox()
         self.font_spin.setRange(8, 48)
         self.font_spin.setValue(config.get_sentence_font_size())
         self.style_combo = QComboBox()
@@ -180,7 +184,7 @@ class SettingsDialog(QDialog):
         self._add_row(gen_form, "set.font_size", self.font_spin)
         layout.addWidget(gen_group)
 
-        # Furigana — readings on non-target kanji.
+        # Furigana
         fg_group = QGroupBox()
         self._reg(fg_group.setTitle, "set.furigana")
         fg_form = QFormLayout(fg_group)
@@ -217,7 +221,7 @@ class SettingsDialog(QDialog):
     def _build_donation_box(self) -> QWidget:
         box = QGroupBox()
         self._reg(box.setTitle, "set.support")
-        box.setObjectName("ainkiDonationBox")  # styling hook for later
+        box.setObjectName("ainkiDonationBox")
         inner = QVBoxLayout(box)
         url = config.get_donation_url()
         label = QLabel()

@@ -1,14 +1,8 @@
 """
-BYOK LLM client. Provider-agnostic by design — `get_provider()` is the single
-swap seam, so new providers slot in without the dialog or trigger knowing which
-one is active.
+BYOK LLM client. `get_provider()` is the single provider-swap seam.
 
-Talks to the API with stdlib `urllib` only. The official SDKs pull in heavy,
-platform-specific dependencies (httpx, pydantic-core) that can't ship cleanly
-inside the add-on zip, so we hand-roll the request instead (CLAUDE.md hard
-constraint #1).
-
-The API key is plaintext BYOK config. Never log it, never put it in a URL.
+Uses stdlib `urllib`, not the official SDK — its native deps (httpx,
+pydantic-core) can't ship inside the add-on zip. Never log the key.
 """
 
 import json
@@ -40,8 +34,7 @@ class AnthropicProvider:
             {
                 "model": self._model,
                 "max_tokens": max_tokens,
-                # No `thinking`: it's off by default on current models and adds
-                # latency we don't want mid-review. (`budget_tokens` would 400.)
+                # No `thinking` param: off by default, and it adds mid-review latency.
                 "system": system,
                 "messages": [{"role": "user", "content": user}],
             }

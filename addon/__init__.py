@@ -1,11 +1,6 @@
 """
-Entry point. Registers the hotkey on the Reviewer window.
-
-- Anki uses a hook system (`gui_hooks`). We attach to reviewer lifecycle hooks to
-  install a QShortcut bound to the reviewer's web view; it only fires during review.
-- Bound once per session — a hotkey change in config takes effect on restart.
-- A non-blocking check warns once if the hotkey collides with a built-in reviewer
-  key (e.g. R, E), which can make either shortcut ambiguous. We don't block it.
+Entry point: registers the reviewer hotkey and the settings menu action.
+The shortcut is bound once per session — a hotkey change takes effect on restart.
 """
 
 from aqt import mw, gui_hooks
@@ -24,7 +19,6 @@ _conflict_checked = False  # warn about a hotkey clash at most once per session
 
 
 def _on_hotkey():
-    """Fired when the user presses the configured hotkey during review."""
     reviewer = mw.reviewer
     card = reviewer.card
     if card is None:
@@ -59,7 +53,6 @@ def _on_hotkey():
 
 
 def _install_shortcut(_card):
-    """Install the shortcut on the reviewer web view once it's ready."""
     global _shortcut_ref
     if _shortcut_ref is not None:
         return
@@ -74,7 +67,7 @@ def _conflicting_reviewer_key(hotkey: str):
     """The built-in reviewer key our hotkey collides with, or None."""
     seq = QKeySequence(hotkey)
     try:
-        # Reviewer shortcut entries are (key, callback[, ...]); key is the first item.
+        # Entries are (key, callback[, ...]); key is the first item.
         for entry in mw.reviewer._shortcutKeys():
             key = entry[0] if isinstance(entry, (tuple, list)) else entry
             if isinstance(key, str) and QKeySequence(key) == seq:
@@ -85,8 +78,7 @@ def _conflicting_reviewer_key(hotkey: str):
 
 
 def _warn_if_hotkey_conflicts(hotkey: str):
-    """Heads-up only (once/session): a clash can make the shortcut ambiguous. The
-    user decides — we never block or rebind."""
+    """Warn only — the user decides; we never block or rebind."""
     global _conflict_checked
     if _conflict_checked:
         return
@@ -101,14 +93,12 @@ gui_hooks.reviewer_did_show_answer.append(_install_shortcut)
 
 
 def _open_settings():
-    # Imported lazily: building the dialog enumerates note types, which needs a
-    # loaded collection (guaranteed once a profile is open).
+    # Lazy import: the dialog enumerates note types, which needs a loaded collection.
     from .ui.settings_dialog import SettingsDialog
 
     SettingsDialog(parent=mw).exec()
 
 
-# Tools → ainki Settings, plus the add-on's Config button → same dialog.
 _settings_action = QAction(tr("menu.settings"), mw)
 qconnect(_settings_action.triggered, _open_settings)
 mw.form.menuTools.addAction(_settings_action)

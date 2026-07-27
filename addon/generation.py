@@ -1,17 +1,10 @@
 """
-Generation pipeline: build the prompt, call the provider, parse the result, and
-(optionally) render furigana.
+Generation pipeline: build the prompt, call the provider, parse, render furigana.
+No Qt here — safe to run on a background thread.
 
-Kept separate from the transport layer (`llm.py`) so new generation modes can be
-added here without touching how we talk to the API. Everything here is plain
-network/CPU work with no Qt — safe to run on a background thread.
-
-Furigana readings come from the LLM we already call: a morphological analyzer
-(MeCab/fugashi/pykakasi) would violate the no-heavy-deps constraint, and the model
-disambiguates context-dependent readings (行った = いった / おこなった) better than a
-naive dictionary lookup. When furigana is enabled the model returns each sentence
-plus a token breakdown (readings + an `is_target` flag) and we render the wrapper
-locally — the sentence is written first so tokenisation can't corrupt its grammar.
+Furigana readings come from the LLM rather than a morphological analyzer
+(MeCab et al. would violate the no-heavy-deps constraint, and the model handles
+context-dependent readings like 行った better than a dictionary lookup).
 """
 
 import json
@@ -24,8 +17,6 @@ from .i18n import tr
 # Kanji (incl. CJK Ext-A) plus the iteration mark.
 _KANJI = re.compile(r"[㐀-䶿一-鿿々]")
 
-# Shared rules — grammaticality and variety are the two things small models get
-# wrong here, so they lead.
 _RULES = (
     "Rules:\n"
     "- Grammatically correct, natural Japanese that fits the requested register and level.\n"
@@ -42,9 +33,8 @@ _SYSTEM_PLAIN = (
     'element: {"jp": "<the sentence>", "en": "<short English translation>"}.'
 )
 
-# Furigana schema writes the sentence FIRST (jp), then tokenises that sentence.
-# Deriving grammar from a token-only schema made the model preserve the target's
-# dictionary form and mangle conjugation — jp-first fixes that.
+# jp is written first, then tokenised: a token-only schema made the model keep
+# the target in dictionary form and mangle conjugation.
 _SYSTEM_FURIGANA = (
     "You write natural Japanese example sentences for a language learner, then "
     "tokenise each for furigana.\n\n"
@@ -62,8 +52,6 @@ _SYSTEM_FURIGANA = (
 )
 
 
-# Register/style injected per the user's setting. "casual" is the default and
-# preserves the colloquial behaviour the add-on shipped with.
 _STYLE_PROMPTS = {
     "casual": "natural, colloquial, everyday spoken Japanese (casual register).",
     "polite": "polite spoken Japanese (です/ます), as used with acquaintances or in service settings.",
@@ -72,8 +60,8 @@ _STYLE_PROMPTS = {
     "mixed": "a mix of registers — vary between casual, polite, and formal across the sentences.",
 }
 
-# Neutral subject areas sampled at random each call to decorrelate regenerations.
-# Topics (not registers) so they compose with any style.
+# Sampled at random each call so repeated generations don't collapse onto the
+# same canonical sentences.
 _TOPICS = [
     "weather", "work", "school", "food and cooking", "travel", "shopping",
     "money", "health", "family", "friends", "hobbies", "sports", "technology",
@@ -103,17 +91,15 @@ def _sample_topics(n: int) -> list[str]:
 
 
 def generate_sentences(vocab: str, level: str, n: int) -> list[dict]:
-    """Returns items shaped {jp, en, tokens}. `tokens` is None when furigana is off.
-
-    Injects the configured register plus a random sample of topics each call, so
-    repeated generations don't collapse onto the same canonical sentences.
-    """
+    """Returns items shaped {jp, en, tokens}. `tokens` is None when furigana is off."""
     furigana = config.get_furigana_mode() != "off"
     style = config.get_style()
     topics = ", ".join(_sample_topics(n))
     system, user = build_prompt(vocab, level, n, furigana, style, topics)
-    # Tokenised output is larger; give it more room.
-    max_tokens = 4096 if furigana else 2048
+    # Scale the output cap with n — a fixed cap truncates the JSON mid-array at
+    # high counts (a furigana item runs ~200-300 tokens; plain ~50).
+    per_item = 350 if furigana else 80
+    max_tokens = max(1024, n * per_item + 256)
     raw = llm.get_provider().complete(system, user, max_tokens=max_tokens)
     data = _load_array(raw)
     return _parse_furigana(data) if furigana else _parse_plain(data)
@@ -150,12 +136,11 @@ def _parse_furigana(data: list) -> list[dict]:
         if not isinstance(entry, dict):
             continue
         tokens = _clean_tokens(entry.get("tokens"))
-        # Trust the model's written sentence; fall back to the token join if absent.
         jp = str(entry.get("jp", "")).strip() or "".join(t["text"] for t in tokens)
         if not jp:
             continue
-        # If tokens don't reconstruct the sentence, drop furigana for this item
-        # rather than render readings against a mismatched string.
+        # Tokens that don't reconstruct jp would render readings against a
+        # mismatched string — drop furigana for this item instead.
         if tokens and "".join(t["text"] for t in tokens) != jp:
             tokens = None
         items.append({"jp": jp, "en": str(entry.get("en", "")), "tokens": tokens})
@@ -211,13 +196,9 @@ def _split_runs(text: str) -> list[tuple[str, bool]]:
 
 
 def _align_furigana(text: str, reading: str):
-    """Map the reading onto the kanji runs only, leaving okurigana/kana bare.
-
-    Returns a list of (substring, reading_or_None) — None for kana runs — or None
-    overall if the reading can't be cleanly aligned (caller falls back to wrapping
-    the whole token). Peels matching kana off the reading so 新しい/あたらしい →
-    [(新, あたら), (しい, None)].
-    """
+    """Map the reading onto kanji runs only, leaving okurigana bare:
+    新しい/あたらしい → [(新, あたら), (しい, None)]. Returns None if the reading
+    can't be cleanly aligned (caller wraps the whole token instead)."""
     runs = _split_runs(text)
     out = []
     ri = 0
@@ -252,13 +233,9 @@ def _wrap(mode: str, template: str, kanji: str, reading: str) -> str:
 
 
 def render(tokens: list[dict], target: str) -> str:
-    """Render tokens to field HTML, applying furigana per the configured mode.
-
-    Furigana sits only on the kanji within a token, not its kana okurigana
-    (新しい → あたら over 新, しい left bare), and never on the target word (kept
-    bare so it stays the one unknown). Reads furigana config fresh so a settings
-    change applies without regenerating.
-    """
+    """Render tokens to field HTML. The target word is never furiganated (it
+    stays the one unknown). Config is read fresh so a settings change applies
+    without regenerating."""
     mode = config.get_furigana_mode()
     template = config.get_furigana_template()
     parts = []

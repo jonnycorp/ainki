@@ -1,16 +1,7 @@
 """
-Lightweight localization for the add-on's own UI text.
-
-Selection is automatic: by default we follow Anki's UI language. A "language"
-config override ("auto" | "en" | "ja" | ...) lets a user pin the add-on to a
-different language than Anki itself. Missing keys/languages fall back to English,
+Localization for the add-on's own UI text (plain dicts, no deps).
+Follows Anki's language unless overridden; missing keys fall back to English,
 then to the key name, so a gap never crashes or shows blank.
-
-Only the add-on's chrome is localized — the generated Japanese sentences are
-content and stay untouched. Dependency-free (plain dicts), per CLAUDE.md.
-
-Japanese strings here are an initial draft and want a native-speaker pass before
-shipping.
 """
 
 from . import config
@@ -112,7 +103,6 @@ CATALOG = {
         "set.language_auto": "Auto (follow Anki)",
         "set.restore_defaults": "Restore defaults",
     },
-    # --- Japanese (needs native-speaker review) ---------------------
     "ja": {
         "menu.settings": "ainki 設定",
         "hotkey.conflict": (
@@ -210,7 +200,7 @@ def _detect_anki_lang() -> str:
     """Anki's active UI language as a base code (e.g. 'ja' from 'ja_JP')."""
     code = None
     try:
-        from anki.lang import current_lang  # set to Anki's active language
+        from anki.lang import current_lang
 
         code = current_lang
     except Exception:
@@ -240,12 +230,9 @@ def current_lang() -> str:
 
 
 def translate(key: str, lang: str, **kwargs) -> str:
-    """Translate `key` into an explicit language, with English then key-name
-    fallback. Used for live preview, where the chosen language isn't saved yet.
-
-    Only interpolates when kwargs are passed, so catalog strings that contain
-    literal braces (the furigana hint's {kanji}/{reading}) are left intact.
-    """
+    """Translate `key` into an explicit language (used for live preview, where
+    the chosen language isn't saved yet). Interpolates only when kwargs are
+    passed, so strings with literal braces ({kanji}/{reading}) stay intact."""
     text = CATALOG.get(lang, {}).get(key) or CATALOG[_DEFAULT].get(key, key)
     if kwargs:
         try:
