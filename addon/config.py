@@ -15,6 +15,7 @@ def _raw() -> dict:
 def _save(cfg: dict) -> None:
     mw.addonManager.writeConfig(_pkg(), cfg)
 
+
 """the hotkey, default is Ctrl+Shift+E"""
 def get_hotkey() -> str:
     return _raw().get("hotkey")
@@ -80,6 +81,7 @@ def get_mapping(note_type_name: str) -> dict:
 
 def all_mappings() -> dict:
     return dict(_raw().get("field_mappings") or {})
+
 
 def save_settings(updates: dict) -> None:
     cfg = _raw()

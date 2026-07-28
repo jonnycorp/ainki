@@ -1,7 +1,5 @@
 """
-Localization for the add-on's own UI text (plain dicts, no deps).
-Follows Anki's language unless overridden; missing keys fall back to English,
-then to the key name, so a gap never crashes or shows blank.
+i18n catalog
 """
 
 from . import config
@@ -88,6 +86,7 @@ CATALOG = {
         "set.model": "Model:",
         "set.language": "Language:",
         "set.language_auto": "Auto (follow Anki)",
+        "set.hotkey": "Hotkey:",
         "set.restore_defaults": "Restore defaults",
     },
     "ja": {
@@ -165,13 +164,12 @@ CATALOG = {
         "set.model": "モデル：",
         "set.language": "言語：",
         "set.language_auto": "自動（Ankiに従う）",
+        "set.hotkey": "ホットキー：",
         "set.restore_defaults": "デフォルトに戻す",
     },
 }
 
-
 def _detect_anki_lang() -> str:
-    """Anki's active UI language as a base code (e.g. 'ja' from 'ja_JP')."""
     code = None
     try:
         from anki.lang import current_lang
@@ -190,23 +188,15 @@ def _detect_anki_lang() -> str:
         return _DEFAULT
     return code.replace("-", "_").split("_")[0].lower()
 
-
 def resolve_lang(code: str) -> str:
-    """An override code → a concrete language ('auto' resolves to Anki's)."""
     if code and code != "auto":
         return code
     return _detect_anki_lang()
 
-
 def current_lang() -> str:
-    """The language the add-on should render in: the config override, or Anki's."""
     return resolve_lang(config.get_language())
 
-
 def translate(key: str, lang: str, **kwargs) -> str:
-    """Translate `key` into an explicit language (used for live preview, where
-    the chosen language isn't saved yet). Interpolates only when kwargs are
-    passed, so plain strings can safely contain literal braces."""
     text = CATALOG.get(lang, {}).get(key) or CATALOG[_DEFAULT].get(key, key)
     if kwargs:
         try:
@@ -215,7 +205,5 @@ def translate(key: str, lang: str, **kwargs) -> str:
             pass
     return text
 
-
 def tr(key: str, **kwargs) -> str:
-    """Translate `key` for the active language."""
     return translate(key, current_lang(), **kwargs)

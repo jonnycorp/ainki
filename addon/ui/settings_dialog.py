@@ -1,5 +1,5 @@
 """
-Settings dialog, opened from Tools → ainki Settings and the add-on's Config button.
+pop-up that appears when ainki settings is pressed
 """
 
 from aqt import mw
@@ -8,6 +8,8 @@ from aqt.qt import (
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QKeySequence,
+    QKeySequenceEdit,
     QLabel,
     QLineEdit,
     QSpinBox,
@@ -23,7 +25,6 @@ from aqt.utils import saveGeom, restoreGeom
 from .. import config
 from ..i18n import tr, translate, resolve_lang
 
-# Anki profile key for this window's saved size/position.
 _GEOM_KEY = "ainkiSettings"
 
 _MODEL_PRESETS = ["claude-sonnet-4-6", "claude-haiku-4-5", "claude-opus-4-8"]
@@ -36,11 +37,10 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self.setMinimumWidth(440)
 
-        self._i18n = []  # (setter, key) pairs for live retranslation
-        # Staged field mappings — edits accumulate here, written on Save.
+        self._i18n = []
         self._mappings = config.all_mappings()
         self._current_nt = None
-        self._loading = False  # guards programmatic combo repopulation
+        self._loading = False
 
         self._reg(self.setWindowTitle, "set.title")
 
@@ -66,18 +66,12 @@ class SettingsDialog(QDialog):
         layout.addWidget(buttons)
 
         self._load_note_types()
-
-        # Default size on first open; restoreGeom reinstates the user's last
-        # geometry (no-op until one has been saved).
         self.resize(450, 480)
         restoreGeom(self, _GEOM_KEY)
 
     def done(self, result):
-        # done() covers every close path (OK, Cancel, window close).
         saveGeom(self, _GEOM_KEY)
         super().done(result)
-
-    # --- live translation -------------------------------------------------
 
     def _reg(self, setter, key: str):
         """Register a translatable setter and apply the current language now."""
@@ -88,8 +82,6 @@ class SettingsDialog(QDialog):
         """Relabel every registered widget in `lang` — no config write."""
         for setter, key in self._i18n:
             setter(translate(key, lang))
-
-    # --- General tab ------------------------------------------------------
 
     def _build_general_tab(self) -> QWidget:
         tab = QWidget()
@@ -108,9 +100,11 @@ class SettingsDialog(QDialog):
         self._reg(lambda t: self.language_combo.setItemText(0, t), "set.language_auto")
         lang_idx = self.language_combo.findData(config.get_language())
         self.language_combo.setCurrentIndex(lang_idx if lang_idx >= 0 else 0)
-        # Connect after setting the index so construction doesn't trigger it.
         qconnect(self.language_combo.currentIndexChanged, self._on_language_changed)
         self._add_row(form, "set.language", self.language_combo)
+
+        self.hotkey_edit = QKeySequenceEdit(QKeySequence(config.get_hotkey()))
+        self._add_row(form, "set.hotkey", self.hotkey_edit)
 
         self.note_type_combo = QComboBox()
         qconnect(self.note_type_combo.currentTextChanged, self._on_note_type_changed)
@@ -173,7 +167,6 @@ class SettingsDialog(QDialog):
         layout.addLayout(form)
         layout.addSpacing(16)
 
-        # Ko-fi link — plain centered label, no box.
         url = config.get_donation_url()
         donate = QLabel()
         self._reg(lambda t, u=url: donate.setText(f'<a href="{u}">{t}</a>'), "set.donate")
@@ -183,7 +176,7 @@ class SettingsDialog(QDialog):
         layout.addWidget(donate)
 
         layout.addStretch()
-        self._on_furigana_mode_changed()  # set initial enabled state
+        self._on_furigana_mode_changed()
         return tab
 
     def _add_row(self, form, key: str, widget):
@@ -195,13 +188,11 @@ class SettingsDialog(QDialog):
     def _on_furigana_mode_changed(self, *_):
         self.furigana_template_edit.setEnabled(self.furigana_combo.currentData() == "custom")
 
-    # --- API Key tab ------------------------------------------------------
-
     def _build_api_tab(self) -> QWidget:
         tab = QWidget()
         form = QFormLayout(tab)
 
-        self.api_key_edit = QLineEdit(config.get_raw_api_key())
+        self.api_key_edit = QLineEdit(config.get_api_key())
         self.api_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
         self._add_row(form, "set.api_key", self.api_key_edit)
         api_note = QLabel()
@@ -209,7 +200,6 @@ class SettingsDialog(QDialog):
         form.addRow("", api_note)
 
         self.provider_combo = QComboBox()
-        self.provider_combo.setEditable(True)
         self.provider_combo.addItems(["anthropic"])
         self.provider_combo.setCurrentText(config.get_provider_name())
         self._add_row(form, "set.provider", self.provider_combo)
@@ -222,8 +212,6 @@ class SettingsDialog(QDialog):
 
         return tab
 
-    # --- field-mapping wiring --------------------------------------------
-
     def _load_note_types(self):
         if mw.col is None:
             return
@@ -234,7 +222,6 @@ class SettingsDialog(QDialog):
         current = self._current_card_note_type()
         if current and current in names:
             self.note_type_combo.setCurrentText(current)
-        # Ensure the field combos populate even if the index didn't change.
         self._on_note_type_changed(self.note_type_combo.currentText())
 
     def _current_card_note_type(self):
@@ -268,8 +255,6 @@ class SettingsDialog(QDialog):
         self._loading = False
 
     def _on_field_changed(self, _text: str):
-        # Only genuine user edits stage a mapping — programmatic repopulation
-        # (note-type switches) runs under _loading and is ignored.
         if self._loading or not self._current_nt:
             return
         self._mappings[self._current_nt] = {
@@ -277,11 +262,10 @@ class SettingsDialog(QDialog):
             "target": self.target_combo.currentText(),
         }
 
-    # --- save -------------------------------------------------------------
-
     def _collect(self) -> dict:
         return {
             "language": self.language_combo.currentData(),
+            "hotkey": self.hotkey_edit.keySequence().toString() or config.get_hotkey(),
             "provider": self.provider_combo.currentText().strip(),
             "model": self.model_combo.currentText().strip(),
             "api_key": self.api_key_edit.text(),
@@ -298,33 +282,36 @@ class SettingsDialog(QDialog):
 
     def _on_save(self):
         config.save_settings(self._collect())
+        from .. import rebind_hotkey
+
+        rebind_hotkey()
         self.accept()
 
     def _on_language_changed(self, *_):
-        # Relabel live, without saving — language persists only on OK (Cancel reverts).
         if self._loading:
             return
         self._retranslate(resolve_lang(self.language_combo.currentData()))
 
     def _restore_defaults(self):
-        # Resets preferences to config.json defaults. Preserves the API key and
-        # field mappings (setup, not preferences). Applies on OK; Cancel aborts.
         d = config.defaults()
-        self._loading = True  # keep the language combo from triggering a reload
-        lang_idx = self.language_combo.findData(d.get("language", "auto"))
+        if not d:
+            return
+        self._loading = True
+        lang_idx = self.language_combo.findData(d["language"])
         self.language_combo.setCurrentIndex(lang_idx if lang_idx >= 0 else 0)
-        self.level_combo.setCurrentText(d.get("level", "intermediate"))
-        style_idx = self.style_combo.findData(d.get("style", "casual"))
+        self.hotkey_edit.setKeySequence(QKeySequence(d["hotkey"]))
+        self.level_combo.setCurrentText(d["level"])
+        style_idx = self.style_combo.findData(d["style"])
         self.style_combo.setCurrentIndex(style_idx if style_idx >= 0 else 0)
-        self.count_spin.setValue(d.get("num_sentences", 5))
-        self.font_spin.setValue(d.get("sentence_font_size", 18))
-        mode_idx = self.mode_combo.findData(d.get("write_mode", "append"))
+        self.count_spin.setValue(d["num_sentences"])
+        self.font_spin.setValue(d["sentence_font_size"])
+        mode_idx = self.mode_combo.findData(d["write_mode"])
         self.mode_combo.setCurrentIndex(mode_idx if mode_idx >= 0 else 0)
-        self.sep_combo.setCurrentText(d.get("append_separator", "<br>"))
-        fg_idx = self.furigana_combo.findData(d.get("furigana_mode", "ruby"))
+        self.sep_combo.setCurrentText(d["append_separator"])
+        fg_idx = self.furigana_combo.findData(d["furigana_mode"])
         self.furigana_combo.setCurrentIndex(fg_idx if fg_idx >= 0 else 1)
-        self.furigana_template_edit.setText(d.get("furigana_template", "{kanji}[{reading}]"))
-        self.model_combo.setCurrentText(d.get("model", "claude-sonnet-4-6"))
+        self.furigana_template_edit.setText(d["furigana_template"])
+        self.model_combo.setCurrentText(d["model"])
         self._loading = False
-        self._on_furigana_mode_changed()  # refresh template field enabled state
+        self._on_furigana_mode_changed()
         self._retranslate(resolve_lang(self.language_combo.currentData()))

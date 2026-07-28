@@ -1,8 +1,5 @@
 """
-BYOK LLM client. `get_provider()` is the single provider-swap seam.
-
-Uses stdlib `urllib`, not the official SDK — its native deps (httpx,
-pydantic-core) can't ship inside the add-on zip. Never log the key.
+llm client, thin wrapper around provider API, only Anthropic for now
 """
 
 import json
@@ -29,7 +26,6 @@ class AnthropicProvider:
         self._model = model
 
     def complete(self, system: str, user: str, max_tokens: int = _MAX_TOKENS) -> str:
-        """Single-turn completion. Returns the joined text of the response."""
         payload = json.dumps(
             {
                 "model": self._model,
@@ -63,15 +59,12 @@ class AnthropicProvider:
 
         return _extract_text(body)
 
-
 def _http_error(err: urllib.error.HTTPError) -> LLMError:
-    """Map an HTTP failure to a clear, key-safe message."""
     if err.code == 401:
         return LLMError(tr("err.bad_key"))
     if err.code == 429:
         return LLMError(tr("err.rate_limit"))
 
-    # For 400 and other codes, surface the provider's own message when present.
     detail = ""
     try:
         parsed = json.loads(err.read().decode("utf-8"))
@@ -82,7 +75,6 @@ def _http_error(err: urllib.error.HTTPError) -> LLMError:
         return LLMError(tr("err.api_detail", code=err.code, detail=detail))
     return LLMError(tr("err.api", code=err.code))
 
-
 def _extract_text(body: dict) -> str:
     blocks = body.get("content", [])
     text = "".join(b.get("text", "") for b in blocks if b.get("type") == "text")
@@ -90,9 +82,7 @@ def _extract_text(body: dict) -> str:
         raise LLMError(tr("err.empty"))
     return text
 
-
 def get_provider():
-    """Build the configured provider. The one place new providers are added."""
     name = config.get_provider_name()
     if name == "anthropic":
         api_key = config.get_api_key()

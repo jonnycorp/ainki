@@ -1,6 +1,5 @@
 """
-Popup shown when the hotkey fires during review: generate sentences, pick some,
-inject into the target field. Generation runs off the Qt main thread via QueryOp.
+pop-up that appears during review when the hotkey is pressed
 """
 
 from aqt import mw
@@ -45,9 +44,9 @@ class SentenceDialog(QDialog):
         super().__init__(parent)
         self.note = note
         self.target_field = target_field
-        self._items: list[dict] = []  # row-aligned with the list; "jp" is the original
+        self._items: list[dict] = []
         self._vocab = vocab_word
-        self._syncing = False  # guards selection<->checkbox mirroring
+        self._syncing = False
 
         self.setWindowTitle(tr("dlg.title"))
         self.setMinimumWidth(540)
@@ -68,7 +67,6 @@ class SentenceDialog(QDialog):
         list_font.setPointSize(config.get_sentence_font_size())
         self.sentence_list.setFont(list_font)
         self.sentence_list.setToolTip(tr("dlg.list_tooltip"))
-        # MultiSelection: each click toggles a row, no Ctrl needed.
         self.sentence_list.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
         self.sentence_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         qconnect(self.sentence_list.itemSelectionChanged, self._on_selection_changed)
@@ -98,8 +96,6 @@ class SentenceDialog(QDialog):
         qconnect(self.add_btn.clicked, self._on_add)
         qconnect(self.cancel_btn.clicked, self.reject)
 
-    # --- generation -------------------------------------------------------
-
     def _on_generate(self):
         vocab = self.word_input.text().strip()
         if not vocab:
@@ -113,7 +109,6 @@ class SentenceDialog(QDialog):
 
         op = QueryOp(
             parent=self,
-            # Off-main-thread; ignores `col`, only does network work.
             op=lambda col: generation.generate_sentences(vocab, level, n),
             success=self._on_generated,
         )
@@ -149,8 +144,6 @@ class SentenceDialog(QDialog):
     def _set_busy(self, busy: bool):
         self.generate_btn.setEnabled(not busy)
 
-    # --- selection <-> checkbox mirroring --------------------------------
-
     def _on_selection_changed(self):
         if self._syncing:
             return
@@ -166,7 +159,6 @@ class SentenceDialog(QDialog):
         self._update_add_enabled()
 
     def _on_item_changed(self, item: QListWidgetItem):
-        # Fires for both checkbox toggles and committed text edits.
         if self._syncing:
             return
         self._syncing = True
@@ -178,8 +170,6 @@ class SentenceDialog(QDialog):
 
     def _update_add_enabled(self):
         self.add_btn.setEnabled(bool(self.sentence_list.selectedItems()))
-
-    # --- edit / revert ----------------------------------------------------
 
     def _show_context_menu(self, pos):
         item = self.sentence_list.itemAt(pos)
@@ -196,8 +186,6 @@ class SentenceDialog(QDialog):
             item.setText(self._items[row]["jp"])
             self.sentence_list.blockSignals(False)
             self._syncing = False
-
-    # --- injection --------------------------------------------------------
 
     def _on_add(self):
         rows = sorted(self.sentence_list.row(it) for it in self.sentence_list.selectedItems())
@@ -234,13 +222,11 @@ class SentenceDialog(QDialog):
         data = self._items[row]
         edited = text != data["jp"]
         tokens = data.get("tokens")
-        # Edited text can't be re-furiganated reliably; write it verbatim.
         if edited or not tokens or config.get_furigana_mode() == "off":
             return text
         return generation.render(tokens, self._vocab)
 
     def _after_inject(self):
-        # Reflect the saved change in the reviewer's current card.
         try:
             mw.reviewer.card.load()
             if mw.reviewer.state == "answer":
@@ -248,5 +234,5 @@ class SentenceDialog(QDialog):
             else:
                 mw.reviewer._showQuestion()
         except Exception:
-            pass  # already persisted; a refresh hiccup shouldn't crash the flow
+            pass
         self.accept()
