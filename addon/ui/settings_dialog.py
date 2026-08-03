@@ -74,12 +74,12 @@ class SettingsDialog(QDialog):
         super().done(result)
 
     def _reg(self, setter, key: str):
-        """Register a translatable setter and apply the current language now."""
+        """register a translatable setter and apply the current language now"""
         self._i18n.append((setter, key))
         setter(tr(key))
 
     def _retranslate(self, lang: str):
-        """Relabel every registered widget in `lang` — no config write."""
+        """relabel every registered widget, no config write"""
         for setter, key in self._i18n:
             setter(translate(key, lang))
 
@@ -180,7 +180,7 @@ class SettingsDialog(QDialog):
         return tab
 
     def _add_row(self, form, key: str, widget):
-        """Add a form row whose left-column label is registered for retranslation."""
+        """form row whose label is registered for retranslation"""
         label = QLabel()
         self._reg(label.setText, key)
         form.addRow(label, widget)

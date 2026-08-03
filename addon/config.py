@@ -3,73 +3,73 @@
 from aqt import mw
 
 
-"""add-on package name, like the marketplace code"""
 def _pkg() -> str:
+    """add-on package name, like the marketplace code"""
     return __name__.split(".")[0]
 
-"""raw current config dict, or {} if failed somehow"""
 def _raw() -> dict:
+    """raw current config dict, or {} if failed somehow"""
     return mw.addonManager.getConfig(_pkg()) or {}
 
-"""update the config dict in Anki's addonManager"""
 def _save(cfg: dict) -> None:
+    """update the config dict in Anki's addonManager"""
     mw.addonManager.writeConfig(_pkg(), cfg)
 
 
-"""the hotkey, default is Ctrl+Shift+E"""
 def get_hotkey() -> str:
+    """the hotkey, default is Ctrl+Shift+E"""
     return _raw().get("hotkey")
 
-"""add-on language"""
 def get_language() -> str:
+    """add-on language"""
     return _raw().get("language")
 
-"""AI provider, currently only 'anthropic' is supported"""
 def get_provider_name() -> str:
+    """AI provider, currently only 'anthropic' is supported"""
     return _raw().get("provider")
 
-"""AI model, currently only Anthropic's Claude is supported"""
 def get_model() -> str:
+    """AI model, currently only Anthropic's Claude is supported"""
     return _raw().get("model")
 
-"""user inputted BYOK"""
 def get_api_key() -> str:
+    """user inputted BYOK"""
     return _raw().get("api_key")
 
-"""language level"""
 def get_level() -> str:
+    """language level"""
     return _raw().get("level")
 
-"""number of sentences to generate"""
 def get_num_sentences() -> int:
+    """number of sentences to generate"""
     return _raw().get("num_sentences")
 
-"""style of the generated sentences"""
 def get_style() -> str:
+    """style of the generated sentences"""
     return _raw().get("style")
 
-"""font size of the generated sentences"""
 def get_sentence_font_size() -> int:
+    """font size of the generated sentences"""
     return _raw().get("sentence_font_size")
 
-"""how the sentence gets added to the field"""
 def get_write_mode() -> str:
+    """how the sentence gets added to the field"""
     return _raw().get("write_mode")
 
-"""separator between sentences like newline"""
 def get_append_separator() -> str:
+    """separator between sentences like newline"""
     return _raw().get("append_separator")
 
-"""the html display mode like ruby"""
 def get_furigana_mode() -> str:
+    """the html display mode like ruby"""
     return _raw().get("furigana_mode")
 
-"""display template"""
 def get_furigana_template() -> str:
+    """display template"""
     return _raw().get("furigana_template")
 
-"""Donation URL :D"""
 def get_donation_url() -> str:
+    """Donation URL :D"""
     return "https://ko-fi.com/yunjay"
 
 def get_mapping(note_type_name: str) -> dict:

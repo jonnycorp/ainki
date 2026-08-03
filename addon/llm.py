@@ -11,7 +11,7 @@ from .i18n import tr
 
 
 class LLMError(Exception):
-    """User-facing failure. The dialog catches this and shows the message."""
+    """user-facing failure, dialog catches and shows the message"""
 
 
 ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
@@ -26,11 +26,11 @@ class AnthropicProvider:
         self._model = model
 
     def complete(self, system: str, user: str, max_tokens: int = _MAX_TOKENS) -> str:
+        """single turn completion, no thinking param since it adds latency mid review"""
         payload = json.dumps(
             {
                 "model": self._model,
                 "max_tokens": max_tokens,
-                # No `thinking` param: off by default, and it adds mid-review latency.
                 "system": system,
                 "messages": [{"role": "user", "content": user}],
             }

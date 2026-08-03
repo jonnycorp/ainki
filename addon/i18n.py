@@ -8,13 +8,11 @@ _DEFAULT = "en"
 
 CATALOG = {
     "en": {
-        # menu / entry
         "menu.settings": "ainki Settings",
         "hotkey.conflict": (
             "ainki: hotkey '{hotkey}' clashes with Anki's reviewer key '{conflict}' — it "
             "may not fire reliably. Change it in the add-on config."
         ),
-        # errors (llm / generation)
         "err.bad_key": "Invalid or expired API key. Check it in the add-on config.",
         "err.rate_limit": "Rate limited by the API. Wait a moment and try again.",
         "err.api_detail": "API error ({code}): {detail}",
@@ -36,7 +34,6 @@ CATALOG = {
             "Available fields: {fields}\n\n"
             "Configure field mappings in the add-on settings."
         ),
-        # generation dialog
         "dlg.title": "AI Sentence Generator",
         "dlg.note_type": "Note type: <b>{name}</b>",
         "dlg.vocab_word": "Vocab word:",
@@ -51,7 +48,6 @@ CATALOG = {
         "dlg.enter_vocab": "Enter a vocab word to generate sentences for.",
         "dlg.generating": "Generating sentences…",
         "dlg.revert": "Revert to original",
-        # settings dialog
         "set.title": "ainki Settings",
         "set.tab_general": "General",
         "set.tab_api": "API Key",

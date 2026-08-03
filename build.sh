@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Build ainki-<version>.ankiaddon for AnkiWeb upload or manual install.
-# Usage: ./build.sh [version] e.g. ./build.sh 1.0.0
+# builds the .ankiaddon for AnkiWeb or manual install, usage: ./build.sh 1.0.0
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -22,7 +21,7 @@ cat > "$STAGE/manifest.json" <<EOF
 {"package": "ainki", "name": "ainki", "human_version": "${VERSION}"}
 EOF
 
-# AnkiWeb expects the files at the zip root, not inside a folder.
+# AnkiWeb wants files at the zip root, not inside a folder
 (cd "$STAGE" && zip -qr "$OUT" .)
 echo "Built $OUT"
 unzip -l "$OUT"
