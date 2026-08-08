@@ -48,6 +48,10 @@ def get_style() -> str:
     """style of the generated sentences"""
     return _raw().get("style")
 
+def get_sentence_length() -> str:
+    """'short', 'medium', or 'long'"""
+    return _raw().get("sentence_length")
+
 def get_sentence_font_size() -> int:
     """font size of the generated sentences"""
     return _raw().get("sentence_font_size")
@@ -78,6 +82,21 @@ def get_mapping(note_type_name: str) -> dict:
     if note_type_name in mappings:
         return mappings[note_type_name]
     return cfg.get("default_mapping") or {}
+
+def get_usage() -> dict:
+    """lifetime tally of what generation has cost"""
+    return _raw().get("usage") or {}
+
+def add_usage(sentences: int, tokens: int, cost) -> None:
+    """fold one generation into the lifetime tally, cost is None for unpriced models"""
+    cfg = _raw()
+    u = cfg.get("usage") or {}
+    u["sentences"] = u.get("sentences", 0) + sentences
+    u["tokens"] = u.get("tokens", 0) + tokens
+    if cost is not None:
+        u["cost"] = round(u.get("cost", 0.0) + cost, 6)
+    cfg["usage"] = u
+    _save(cfg)
 
 def all_mappings() -> dict:
     return dict(_raw().get("field_mappings") or {})

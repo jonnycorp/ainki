@@ -16,8 +16,27 @@ class LLMError(Exception):
 
 ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
 ANTHROPIC_VERSION = "2023-06-01"
-_TIMEOUT_SECONDS = 30
+_TIMEOUT_SECONDS = 60
 _MAX_TOKENS = 2048
+
+_PRICING = {
+    "claude-sonnet-5": (3.00, 15.00),
+    "claude-haiku-4-5": (1.00, 5.00),
+    "claude-opus-5": (5.00, 25.00),
+    "claude-opus-4-8": (5.00, 25.00),
+    "claude-opus-4-7": (5.00, 25.00),
+    "claude-opus-4-6": (5.00, 25.00),
+    "claude-sonnet-4-6": (3.00, 15.00),
+    "claude-sonnet-4-5": (3.00, 15.00),
+}
+
+
+def cost_usd(input_tokens: int, output_tokens: int, model: str):
+    """usd for one call, or None when we have no price for the model"""
+    rate = _PRICING.get(model)
+    if rate is None:
+        return None
+    return (input_tokens * rate[0] + output_tokens * rate[1]) / 1_000_000
 
 
 class AnthropicProvider:
@@ -25,12 +44,17 @@ class AnthropicProvider:
         self._api_key = api_key
         self._model = model
 
-    def complete(self, system: str, user: str, max_tokens: int = _MAX_TOKENS) -> str:
-        """single turn completion, no thinking param since it adds latency mid review"""
+    def complete(self, system: str, user: str, max_tokens: int = _MAX_TOKENS) -> tuple:
+        """single turn completion, returns (text, usage)
+
+        thinking is disabled explicitly, not by omission: newer models default it
+        on and it shares the max_tokens budget, which truncates the json
+        """
         payload = json.dumps(
             {
                 "model": self._model,
                 "max_tokens": max_tokens,
+                "thinking": {"type": "disabled"},
                 "system": system,
                 "messages": [{"role": "user", "content": user}],
             }
@@ -57,7 +81,7 @@ class AnthropicProvider:
         except TimeoutError as err:
             raise LLMError(tr("err.timeout")) from err
 
-        return _extract_text(body)
+        return _extract_text(body), body.get("usage") or {}
 
 def _http_error(err: urllib.error.HTTPError) -> LLMError:
     if err.code == 401:

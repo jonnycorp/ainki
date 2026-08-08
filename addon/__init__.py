@@ -1,5 +1,9 @@
 """
 entry point for the add-on
+
+ainki - AI Japanese sentence generator for Anki
+Copyright (C) 2026 Jonathan Ma
+SPDX-License-Identifier: AGPL-3.0-or-later
 """
 
 from aqt import mw, gui_hooks

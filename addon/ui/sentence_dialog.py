@@ -21,8 +21,10 @@ from aqt.qt import (
 )
 from aqt.utils import showWarning
 
-from .. import config, generation
+from .. import config, generation, llm
 from ..i18n import tr
+
+_MAX_AVOID = 30
 
 _ITEM_FLAGS = (
     Qt.ItemFlag.ItemIsSelectable
@@ -84,8 +86,11 @@ class SentenceDialog(QDialog):
         self.add_btn.setEnabled(False)
         self.cancel_btn = QPushButton(tr("dlg.cancel"))
 
+        self.cost_label = QLabel("")
+
         btn_row.addWidget(self.generate_btn)
         btn_row.addWidget(self.select_all_btn)
+        btn_row.addWidget(self.cost_label)
         btn_row.addStretch()
         btn_row.addWidget(self.add_btn)
         btn_row.addWidget(self.cancel_btn)
@@ -101,20 +106,24 @@ class SentenceDialog(QDialog):
         if not vocab:
             showWarning(tr("dlg.enter_vocab"))
             return
+        # sentences for a different word are not worth avoiding
+        same_word = vocab == self._vocab
         self._vocab = vocab
 
         self._set_busy(True)
         level = config.get_level()
         n = config.get_num_sentences()
 
+        avoid = [i["jp"] for i in self._items][-_MAX_AVOID:] if same_word else []
         op = QueryOp(
             parent=self,
-            op=lambda col: generation.generate_sentences(vocab, level, n),
+            op=lambda col: generation.generate_sentences(vocab, level, n, avoid),
             success=self._on_generated,
         )
         op.failure(self._on_error).with_progress(tr("dlg.generating")).run_in_background()
 
-    def _on_generated(self, items: list[dict]):
+    def _on_generated(self, result: tuple):
+        items, usage = result
         self._set_busy(False)
         was_empty = not self._items
 
@@ -131,6 +140,7 @@ class SentenceDialog(QDialog):
         self.sentence_list.blockSignals(False)
         self._syncing = False
 
+        self._record_usage(items, usage)
         self.sentence_list.setEnabled(True)
         self.select_all_btn.setEnabled(bool(self._items))
         self.generate_btn.setText(tr("dlg.generate_more"))
@@ -143,6 +153,19 @@ class SentenceDialog(QDialog):
 
     def _set_busy(self, busy: bool):
         self.generate_btn.setEnabled(not busy)
+
+    def _record_usage(self, items: list, usage: dict):
+        """lifetime tally goes to settings, this batch's spend shows here in us cents"""
+        tin = usage.get("input_tokens", 0)
+        tout = usage.get("output_tokens", 0)
+        cost = llm.cost_usd(tin, tout, config.get_model())
+        config.add_usage(len(items), tin + tout, cost)
+        if cost is None:
+            self.cost_label.setText("")
+            return
+        cents = cost * 100
+        text = tr("dlg.batch_cost", cents=f"{cents:.1f}" if cents >= 0.1 else f"{cents:.2f}")
+        self.cost_label.setText(f"<span style='color:gray;'>{text}</span>")
 
     def _on_selection_changed(self):
         if self._syncing:

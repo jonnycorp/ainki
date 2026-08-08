@@ -22,12 +22,12 @@ from aqt.qt import (
 
 from aqt.utils import saveGeom, restoreGeom
 
-from .. import config
+from .. import config, generation
 from ..i18n import tr, translate, resolve_lang
 
 _GEOM_KEY = "ainkiSettings"
 
-_MODEL_PRESETS = ["claude-sonnet-4-6", "claude-haiku-4-5", "claude-opus-4-8"]
+_MODEL_PRESETS = ["claude-sonnet-5", "claude-haiku-4-5", "claude-opus-5"]
 _LEVEL_PRESETS = ["beginner", "intermediate", "advanced", "N5", "N4", "N3", "N2", "N1"]
 _SEPARATOR_PRESETS = ["<br>", "<br><br>"]
 
@@ -146,8 +146,15 @@ class SettingsDialog(QDialog):
             self._reg(lambda t, i=i: self.style_combo.setItemText(i, t), f"set.style_{value}")
         style_idx = self.style_combo.findData(config.get_style())
         self.style_combo.setCurrentIndex(style_idx if style_idx >= 0 else 0)
+        self.length_combo = QComboBox()
+        for i, value in enumerate(("short", "medium", "long")):
+            self.length_combo.addItem("", value)
+            self._reg(lambda t, i=i: self.length_combo.setItemText(i, t), f"set.length_{value}")
+        len_idx = self.length_combo.findData(config.get_sentence_length())
+        self.length_combo.setCurrentIndex(len_idx if len_idx >= 0 else 1)
         self._add_row(form, "set.level", self.level_combo)
         self._add_row(form, "set.style", self.style_combo)
+        self._add_row(form, "set.length", self.length_combo)
         self._add_row(form, "set.count", self.count_spin)
         self._add_row(form, "set.font_size", self.font_spin)
 
@@ -210,7 +217,47 @@ class SettingsDialog(QDialog):
         self.model_combo.setCurrentText(config.get_model())
         self._add_row(form, "set.model", self.model_combo)
 
+        self.price_label = QLabel()
+        form.addRow("", self.price_label)
+        self.usage_label = QLabel()
+        form.addRow("", self.usage_label)
+        self._refresh_usage()
+        qconnect(self.model_combo.currentTextChanged, self._refresh_price)
+        qconnect(self.count_spin.valueChanged, self._refresh_price)
+        qconnect(self.furigana_combo.currentIndexChanged, self._refresh_price)
+        qconnect(self.length_combo.currentIndexChanged, self._refresh_price)
+        self._refresh_price()
+
         return tab
+
+    def _refresh_price(self, *_):
+        """cost of one sentence at the settings currently on screen"""
+        cost = generation.estimate_per_sentence(
+            self.count_spin.value(),
+            self.furigana_combo.currentData() != "off",
+            self.model_combo.currentText().strip(),
+            self.length_combo.currentData(),
+        )
+        if cost is None:
+            self.price_label.setText("")
+            return
+        text = tr("set.model_est", cost=f"{cost:.4f}")
+        self.price_label.setText(f"<span style='color:gray;'>{text}</span>")
+
+    def _refresh_usage(self):
+        """lifetime tally, priced only for what we had rates for at the time"""
+        u = config.get_usage()
+        count = u.get("sentences", 0)
+        if not count:
+            self.usage_label.setText("")
+            return
+        cost = u.get("cost", 0.0)
+        if cost:
+            spent = f"{cost:.2f}" if cost >= 0.01 else f"{cost:.4f}"
+            text = tr("set.usage_total", count=f"{count:,}", cost=spent)
+        else:
+            text = tr("set.usage_tokens", count=f"{count:,}", tokens=f"{u.get('tokens', 0):,}")
+        self.usage_label.setText(f"<span style='color:gray;'>{text}</span>")
 
     def _load_note_types(self):
         if mw.col is None:
@@ -273,6 +320,7 @@ class SettingsDialog(QDialog):
             "num_sentences": self.count_spin.value(),
             "sentence_font_size": self.font_spin.value(),
             "style": self.style_combo.currentData(),
+            "sentence_length": self.length_combo.currentData(),
             "write_mode": self.mode_combo.currentData(),
             "append_separator": self.sep_combo.currentText(),
             "furigana_mode": self.furigana_combo.currentData(),
@@ -303,6 +351,8 @@ class SettingsDialog(QDialog):
         self.level_combo.setCurrentText(d["level"])
         style_idx = self.style_combo.findData(d["style"])
         self.style_combo.setCurrentIndex(style_idx if style_idx >= 0 else 0)
+        len_idx = self.length_combo.findData(d["sentence_length"])
+        self.length_combo.setCurrentIndex(len_idx if len_idx >= 0 else 1)
         self.count_spin.setValue(d["num_sentences"])
         self.font_spin.setValue(d["sentence_font_size"])
         mode_idx = self.mode_combo.findData(d["write_mode"])

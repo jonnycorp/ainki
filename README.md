@@ -48,7 +48,7 @@ Here's an explanation of the settings that you should modify in *Tools → ainki
 Key settings:
 - `API key` — your provider key ***(MOST IMPORATANT)***
 - `Hotkey` — the reviewer shortcut to open the sentence generator
-- `Provider` / `Model` — currently defaults to `anthropic` and `claude-haiku-4-5`
+- `Provider` / `Model` — currently defaults to `anthropic` and `claude-sonnet-5`
 - `Level` — learner level you want the sentences to be created for
 - `Number of sentences` — how many sentences are generated when you click *Generate*
 - `Write mode` — `append` will add new sentences below existing content; `overwrite` replaces everything if you want to switch it up from time to time
@@ -106,4 +106,4 @@ ainki/                            # repo root
 
 Licensed under **AGPL-3.0-or-later**, what Anki wants.
 
-<!-- Copyright (C) 2026 TODO: your name / handle -->
+Copyright (C) 2026 Jonathan Ma
