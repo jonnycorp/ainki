@@ -5,3 +5,5 @@ __pycache__/
 .vscode/
 meta.json
 dist/
+tools/last_matrix.md
+tools/last_run.log

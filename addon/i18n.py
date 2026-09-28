@@ -182,6 +182,7 @@ CATALOG = {
 }
 
 def _detect_anki_lang() -> str:
+    """anki's own ui language as a base code like 'ja'"""
     code = None
     try:
         from anki.lang import current_lang
@@ -201,14 +202,17 @@ def _detect_anki_lang() -> str:
     return code.replace("-", "_").split("_")[0].lower()
 
 def resolve_lang(code: str) -> str:
+    """turn a config value into a real language, 'auto' means follow anki"""
     if code and code != "auto":
         return code
     return _detect_anki_lang()
 
 def current_lang() -> str:
+    """the language the add-on should draw itself in"""
     return resolve_lang(config.get_language())
 
 def translate(key: str, lang: str, **kwargs) -> str:
+    """look up a key in an explicit language, falling back to english"""
     text = CATALOG.get(lang, {}).get(key) or CATALOG[_DEFAULT].get(key, key)
     if kwargs:
         try:
@@ -218,4 +222,5 @@ def translate(key: str, lang: str, **kwargs) -> str:
     return text
 
 def tr(key: str, **kwargs) -> str:
+    """look up a key in whatever language is active"""
     return translate(key, current_lang(), **kwargs)

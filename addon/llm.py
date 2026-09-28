@@ -40,16 +40,14 @@ def cost_usd(input_tokens: int, output_tokens: int, model: str):
 
 
 class AnthropicProvider:
+    """talks to the anthropic messages api with stdlib urllib only"""
     def __init__(self, api_key: str, model: str):
         self._api_key = api_key
         self._model = model
 
     def complete(self, system: str, user: str, max_tokens: int = _MAX_TOKENS) -> tuple:
-        """single turn completion, returns (text, usage)
-
-        thinking is disabled explicitly, not by omission: newer models default it
-        on and it shares the max_tokens budget, which truncates the json
-        """
+        """one round trip to the provider, returns (text, usage)"""
+        """thinking off explicitly, newer models default it on and it shares max_tokens"""
         payload = json.dumps(
             {
                 "model": self._model,
@@ -84,11 +82,13 @@ class AnthropicProvider:
         return _extract_text(body), body.get("usage") or {}
 
 def _http_error(err: urllib.error.HTTPError) -> LLMError:
+    """turn an http failure into a message the dialog can show, never leaking the key"""
     if err.code == 401:
         return LLMError(tr("err.bad_key"))
     if err.code == 429:
         return LLMError(tr("err.rate_limit"))
 
+    """for 400 and friends the provider's own message is more useful than ours"""
     detail = ""
     try:
         parsed = json.loads(err.read().decode("utf-8"))
@@ -100,6 +100,7 @@ def _http_error(err: urllib.error.HTTPError) -> LLMError:
     return LLMError(tr("err.api", code=err.code))
 
 def _extract_text(body: dict) -> str:
+    """join the text blocks of a response, erroring when there are none"""
     blocks = body.get("content", [])
     text = "".join(b.get("text", "") for b in blocks if b.get("type") == "text")
     if not text.strip():
@@ -107,6 +108,7 @@ def _extract_text(body: dict) -> str:
     return text
 
 def get_provider():
+    """build the configured provider, the one place a new provider gets added"""
     name = config.get_provider_name()
     if name == "anthropic":
         api_key = config.get_api_key()

@@ -115,6 +115,7 @@ def build_prompt(
     avoid: list = None,
     length: str = "medium",
 ) -> tuple[str, str]:
+    """assemble the system and user messages for one generation request"""
     system = _SYSTEM_FURIGANA if furigana else _SYSTEM_PLAIN
     register = _STYLE_PROMPTS.get(style, _STYLE_PROMPTS["casual"])
     user = (
@@ -127,6 +128,7 @@ def build_prompt(
         f"Vary the grammar too — across the set use forms such as: {frames}.\n"
     )
     if avoid:
+        """negative exemplars, the model has no memory of earlier batches without them"""
         listed = "\n".join(f"- {s}" for s in avoid)
         user += (
             "\nThese sentences already exist for this word. Do not repeat them, and do "
@@ -138,25 +140,25 @@ def build_prompt(
     return system, user
 
 def _sample_topics(n: int) -> list[str]:
+    """a random subject area per sentence so regenerations don't repeat themselves"""
     return random.sample(_TOPICS, min(max(n, 4), len(_TOPICS)))
 
 def _sample_frames(n: int) -> list[str]:
+    """a random grammar form per sentence, topics alone still give flat declaratives"""
     return random.sample(_FRAMES, min(max(n, 3), len(_FRAMES)))
 
 def generate_sentences(vocab: str, level: str, n: int, avoid: list = None) -> tuple:
-    """returns (items, usage)
-
-    avoid holds sentences already on screen so a regenerate can't repeat them
-    """
+    """build the prompt, call the provider, parse the reply into (items, usage)"""
     furigana = config.get_furigana_mode() != "off"
     style = config.get_style()
     length = config.get_sentence_length()
     topics = ", ".join(_sample_topics(n))
     frames = ", ".join(_sample_frames(n))
+    """avoid holds sentences already on screen so a regenerate can't repeat them"""
     system, user = build_prompt(
         vocab, level, n, furigana, style, topics, frames, avoid, length
     )
-    # measured ~490 out per furigana sentence, cap generously: unused headroom is free
+    """measured ~490 out per furigana sentence, unused headroom costs nothing"""
     per_item = 700 if furigana else 150
     per_item *= _LENGTH_TOKEN_SCALE.get(length, 1.0)
     max_tokens = int(max(2048, n * per_item + 512))
@@ -166,12 +168,8 @@ def generate_sentences(vocab: str, level: str, n: int, avoid: list = None) -> tu
     return items, usage
 
 def _is_japanese(text: str) -> bool:
-    """every letter must be kana or kanji
-
-    the model samples from one multilingual vocabulary, so it rarely slips a latin
-    or cyrillic word into an otherwise japanese sentence; a prompt rule cannot make
-    that never happen, so drop those sentences here. digits and punctuation pass
-    """
+    """true when every letter in the text is kana or kanji"""
+    """the model samples one multilingual vocabulary and rarely slips in latin or cyrillic"""
     for ch in text:
         if not ch.isalpha():
             continue
@@ -182,6 +180,7 @@ def _is_japanese(text: str) -> bool:
 
 
 def _load_array(text: str) -> list:
+    """parse the reply into a json array, raising a user-facing error if it isn't one"""
     cleaned = _strip_code_fences(text.strip())
     try:
         data = json.loads(cleaned)
@@ -192,6 +191,7 @@ def _load_array(text: str) -> list:
     return data
 
 def _parse_plain(data: list) -> list[dict]:
+    """entries to items shaped {jp, en, tokens}, tokens always None without furigana"""
     items = [
         {"jp": str(e["jp"]), "en": str(e.get("en", "")), "tokens": None}
         for e in data
@@ -202,6 +202,7 @@ def _parse_plain(data: list) -> list[dict]:
     return items
 
 def _parse_furigana(data: list) -> list[dict]:
+    """entries to items shaped {jp, en, tokens}, keeping the readings for rendering"""
     items: list[dict] = []
     for entry in data:
         if not isinstance(entry, dict):
@@ -210,6 +211,7 @@ def _parse_furigana(data: list) -> list[dict]:
         jp = str(entry.get("jp", "")).strip() or "".join(t["text"] for t in tokens)
         if not jp or not _is_japanese(jp):
             continue
+        """tokens that don't rebuild jp would hang readings on the wrong characters"""
         if tokens and "".join(t["text"] for t in tokens) != jp:
             tokens = None
         items.append({"jp": jp, "en": str(entry.get("en", "")), "tokens": tokens})
@@ -218,6 +220,7 @@ def _parse_furigana(data: list) -> list[dict]:
     return items
 
 def _clean_tokens(raw) -> list[dict]:
+    """coerce the model's token list into {text, reading, is_target} dicts"""
     if not isinstance(raw, list):
         return []
     tokens = []
@@ -233,6 +236,7 @@ def _clean_tokens(raw) -> list[dict]:
     return tokens
 
 def _strip_code_fences(text: str) -> str:
+    """unwrap a ```json fence, the model adds one despite being told not to"""
     text = text.strip()
     if not text.startswith("```"):
         return text
@@ -246,6 +250,7 @@ def _strip_code_fences(text: str) -> str:
     return text
 
 def _split_runs(text: str) -> list[tuple[str, bool]]:
+    """split text into consecutive (substring, is_kanji) runs"""
     runs: list[tuple[str, bool]] = []
     for ch in text:
         is_kanji = bool(_KANJI.match(ch))
@@ -256,6 +261,8 @@ def _split_runs(text: str) -> list[tuple[str, bool]]:
     return runs
 
 def _align_furigana(text: str, reading: str):
+    """map a reading onto kanji runs only, or None when it can't be split cleanly"""
+    """新しい/あたらしい becomes [(新, あたら), (しい, None)] so okurigana stays bare"""
     runs = _split_runs(text)
     out = []
     ri = 0
@@ -266,6 +273,7 @@ def _align_furigana(text: str, reading: str):
             out.append((sub, None))
             ri += len(sub)
         else:
+            """a kanji run reads up to wherever the next kana run appears"""
             if i + 1 < len(runs):
                 pos = reading.find(runs[i + 1][0], ri)
                 if pos == -1:
@@ -281,11 +289,14 @@ def _align_furigana(text: str, reading: str):
     return out if ri == len(reading) else None
 
 def _wrap(mode: str, template: str, kanji: str, reading: str) -> str:
+    """put one reading on one kanji run, as ruby html or the user's own template"""
     if mode == "ruby":
         return f"<ruby>{kanji}<rt>{reading}</rt></ruby>"
+    """literal replace so stray braces in a user template can't blow up"""
     return template.replace("{kanji}", kanji).replace("{reading}", reading)
 
 def render(tokens: list[dict], target: str) -> str:
+    """turn tokens into the html that lands in the card field"""
     mode = config.get_furigana_mode()
     template = config.get_furigana_template()
     parts = []
@@ -293,11 +304,13 @@ def render(tokens: list[dict], target: str) -> str:
         text = tok["text"]
         reading = tok.get("reading", "")
         is_target = tok.get("is_target") or (target and target in text)
+        """the target keeps no reading, it is the one word being studied"""
         if mode == "off" or is_target or not reading or not _KANJI.search(text):
             parts.append(text)
             continue
         segments = _align_furigana(text, reading)
         if segments is None:
+            """couldn't peel okurigana, put the reading over the whole token"""
             parts.append(_wrap(mode, template, text, reading))
         else:
             parts.append(

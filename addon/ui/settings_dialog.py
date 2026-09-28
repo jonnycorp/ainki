@@ -33,6 +33,7 @@ _SEPARATOR_PRESETS = ["<br>", "<br><br>"]
 
 
 class SettingsDialog(QDialog):
+    """the whole configuration surface, general settings and the api key"""
     def __init__(self, parent):
         super().__init__(parent)
         self.setMinimumWidth(440)
@@ -70,6 +71,7 @@ class SettingsDialog(QDialog):
         restoreGeom(self, _GEOM_KEY)
 
     def done(self, result):
+        """save window geometry on every close path"""
         saveGeom(self, _GEOM_KEY)
         super().done(result)
 
@@ -84,6 +86,7 @@ class SettingsDialog(QDialog):
             setter(translate(key, lang))
 
     def _build_general_tab(self) -> QWidget:
+        """one flat form of every setting, plus the support link"""
         tab = QWidget()
         layout = QVBoxLayout(tab)
         layout.setContentsMargins(8, 8, 8, 8)
@@ -193,9 +196,11 @@ class SettingsDialog(QDialog):
         form.addRow(label, widget)
 
     def _on_furigana_mode_changed(self, *_):
+        """the custom template only applies in custom mode"""
         self.furigana_template_edit.setEnabled(self.furigana_combo.currentData() == "custom")
 
     def _build_api_tab(self) -> QWidget:
+        """key, provider and model, with cost shown underneath"""
         tab = QWidget()
         form = QFormLayout(tab)
 
@@ -260,6 +265,7 @@ class SettingsDialog(QDialog):
         self.usage_label.setText(f"<span style='color:gray;'>{text}</span>")
 
     def _load_note_types(self):
+        """fill the note type list and preselect the card being reviewed"""
         if mw.col is None:
             return
         names = sorted(nt["name"] for nt in mw.col.models.all())
@@ -272,6 +278,7 @@ class SettingsDialog(QDialog):
         self._on_note_type_changed(self.note_type_combo.currentText())
 
     def _current_card_note_type(self):
+        """the note type of the card on screen, or None outside review"""
         try:
             if mw.reviewer and mw.reviewer.card:
                 return mw.reviewer.card.note().note_type()["name"]
@@ -280,10 +287,12 @@ class SettingsDialog(QDialog):
         return None
 
     def _field_names(self, note_type_name: str) -> list:
+        """field names of a note type, empty when it can't be found"""
         nt = mw.col.models.by_name(note_type_name) if mw.col else None
         return [f["name"] for f in nt["flds"]] if nt else []
 
     def _on_note_type_changed(self, name: str):
+        """repopulate the field pickers for the chosen note type"""
         if not name:
             return
         self._loading = True
@@ -302,6 +311,7 @@ class SettingsDialog(QDialog):
         self._loading = False
 
     def _on_field_changed(self, _text: str):
+        """stage a mapping edit, ignoring programmatic repopulation"""
         if self._loading or not self._current_nt:
             return
         self._mappings[self._current_nt] = {
@@ -310,6 +320,7 @@ class SettingsDialog(QDialog):
         }
 
     def _collect(self) -> dict:
+        """every widget value as the config dict to save"""
         return {
             "language": self.language_combo.currentData(),
             "hotkey": self.hotkey_edit.keySequence().toString() or config.get_hotkey(),
@@ -329,6 +340,7 @@ class SettingsDialog(QDialog):
         }
 
     def _on_save(self):
+        """persist settings and apply the ones that take effect immediately"""
         config.save_settings(self._collect())
         from .. import rebind_hotkey
 
@@ -336,11 +348,13 @@ class SettingsDialog(QDialog):
         self.accept()
 
     def _on_language_changed(self, *_):
+        """relabel the dialog live, the choice only persists on ok"""
         if self._loading:
             return
         self._retranslate(resolve_lang(self.language_combo.currentData()))
 
     def _restore_defaults(self):
+        """reset preferences to config.json, keeping key and mappings"""
         d = config.defaults()
         if not d:
             return

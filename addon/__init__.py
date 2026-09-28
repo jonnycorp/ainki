@@ -21,6 +21,7 @@ _conflict_checked = False
 
 
 def _on_hotkey():
+    """open the generator for the card on screen when the hotkey fires"""
     reviewer = mw.reviewer
     card = reviewer.card
     if card is None:
@@ -54,6 +55,7 @@ def _on_hotkey():
     dialog.exec()
 
 def _install_shortcut(_card):
+    """bind the shortcut to the reviewer web view, once per session"""
     global _shortcut_ref
     if _shortcut_ref is not None:
         return
@@ -64,6 +66,7 @@ def _install_shortcut(_card):
     _warn_if_hotkey_conflicts(hotkey)
 
 def _conflicting_reviewer_key(hotkey: str):
+    """the built-in reviewer key our hotkey collides with, or None"""
     seq = QKeySequence(hotkey)
     try:
         for entry in mw.reviewer._shortcutKeys():
@@ -75,6 +78,7 @@ def _conflicting_reviewer_key(hotkey: str):
     return None
 
 def _warn_if_hotkey_conflicts(hotkey: str):
+    """tell the user about a clash once, never block or rebind"""
     global _conflict_checked
     if _conflict_checked:
         return
@@ -84,6 +88,7 @@ def _warn_if_hotkey_conflicts(hotkey: str):
         tooltip(tr("hotkey.conflict", hotkey=hotkey, conflict=clash))
 
 def rebind_hotkey():
+    """point the live shortcut at the saved hotkey, no restart needed"""
     global _conflict_checked
     if _shortcut_ref is None:
         return
@@ -98,6 +103,7 @@ gui_hooks.reviewer_did_show_answer.append(_install_shortcut)
 
 
 def _open_settings():
+    """open the settings dialog, imported late so the collection is loaded"""
     from .ui.settings_dialog import SettingsDialog
     SettingsDialog(parent=mw).exec()
 

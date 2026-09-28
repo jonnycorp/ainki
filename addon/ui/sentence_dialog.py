@@ -35,6 +35,7 @@ _ITEM_FLAGS = (
 
 
 class SentenceDialog(QDialog):
+    """the review popup, generates candidate sentences and writes chosen ones to the note"""
     def __init__(
         self,
         parent,
@@ -102,11 +103,11 @@ class SentenceDialog(QDialog):
         qconnect(self.cancel_btn.clicked, self.reject)
 
     def _on_generate(self):
+        """start a background generation for the word in the box"""
         vocab = self.word_input.text().strip()
         if not vocab:
             showWarning(tr("dlg.enter_vocab"))
             return
-        # sentences for a different word are not worth avoiding
         same_word = vocab == self._vocab
         self._vocab = vocab
 
@@ -123,6 +124,7 @@ class SentenceDialog(QDialog):
         op.failure(self._on_error).with_progress(tr("dlg.generating")).run_in_background()
 
     def _on_generated(self, result: tuple):
+        """append the new sentences to the list and record what they cost"""
         items, usage = result
         self._set_busy(False)
         was_empty = not self._items
@@ -148,14 +150,16 @@ class SentenceDialog(QDialog):
             self.sentence_list.item(0).setSelected(True)
 
     def _on_error(self, exc: Exception):
+        """surface a generation failure to the user"""
         self._set_busy(False)
         showWarning(str(exc))
 
     def _set_busy(self, busy: bool):
+        """disable generate while a request is in flight"""
         self.generate_btn.setEnabled(not busy)
 
     def _record_usage(self, items: list, usage: dict):
-        """lifetime tally goes to settings, this batch's spend shows here in us cents"""
+        """lifetime tally to settings, this batch's spend shown in us cents"""
         tin = usage.get("input_tokens", 0)
         tout = usage.get("output_tokens", 0)
         cost = llm.cost_usd(tin, tout, config.get_model())
@@ -168,6 +172,7 @@ class SentenceDialog(QDialog):
         self.cost_label.setText(f"<span style='color:gray;'>{text}</span>")
 
     def _on_selection_changed(self):
+        """mirror the row selection onto the checkboxes"""
         if self._syncing:
             return
         self._syncing = True
@@ -182,6 +187,7 @@ class SentenceDialog(QDialog):
         self._update_add_enabled()
 
     def _on_item_changed(self, item: QListWidgetItem):
+        """mirror a checkbox or a committed edit back onto the selection"""
         if self._syncing:
             return
         self._syncing = True
@@ -192,9 +198,11 @@ class SentenceDialog(QDialog):
         self._update_add_enabled()
 
     def _update_add_enabled(self):
+        """add to card only makes sense with something selected"""
         self.add_btn.setEnabled(bool(self.sentence_list.selectedItems()))
 
     def _show_context_menu(self, pos):
+        """right click menu offering revert on an edited row"""
         item = self.sentence_list.itemAt(pos)
         if item is None:
             return
@@ -211,6 +219,7 @@ class SentenceDialog(QDialog):
             self._syncing = False
 
     def _on_add(self):
+        """write every selected sentence into the target field"""
         rows = sorted(self.sentence_list.row(it) for it in self.sentence_list.selectedItems())
         if not rows:
             return
@@ -240,6 +249,7 @@ class SentenceDialog(QDialog):
         ).run_in_background()
 
     def _content_for_row(self, row: int) -> str:
+        """the html for one row, furigana applied unless it was edited"""
         item = self.sentence_list.item(row)
         text = item.text()
         data = self._items[row]
@@ -250,6 +260,7 @@ class SentenceDialog(QDialog):
         return generation.render(tokens, self._vocab)
 
     def _after_inject(self):
+        """redraw the reviewer so the saved change shows immediately"""
         try:
             mw.reviewer.card.load()
             if mw.reviewer.state == "answer":
